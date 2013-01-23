@@ -1,0 +1,8 @@
+/build
+/.coverage
+/cov_html
+/dist
+/aversion.egg-info
+/.tox
+*.log
+*.pyc
