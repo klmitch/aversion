@@ -42,7 +42,7 @@ setup(
     long_description=readfile('README.rst'),
     entry_points={
         'paste.composite_factory': [
-            'aversion = aversion:aversion_factory',
+            'aversion = aversion:AVersion',
         ],
     },
     install_requires=readreq('.requires'),
