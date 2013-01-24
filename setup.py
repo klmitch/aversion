@@ -26,7 +26,7 @@ setup(
     version='0.1.0',
     author='Kevin L. Mitchell',
     author_email='kevin.mitchell@rackspace.com',
-    description="AVersion",
+    description="AVersion WSGI Version Selection Application",
     license='Apache License (2.0)',
     py_modules=['aversion'],
     classifiers=[
