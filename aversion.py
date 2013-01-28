@@ -15,19 +15,69 @@
 
 
 class TypeRule(object):
+    """
+    Represents a basic rule for content type interpretation.
+    """
+
     def __init__(self, ctype, version):
+        """
+        Initialize a TypeRule object.
+
+        :param ctype: The resultant content type.  If None, the
+                      existing content type will be used; otherwise,
+                      the content type will be formed by formatting
+                      the string, using the parameter dictionary.
+        :param version: The resultant version.  If None, no version
+                        will be returned; otherwise, the version will
+                        be formed by formatting the string, using the
+                        parameter dictionary.
+        """
+
         self.ctype = ctype
         self.version = version
 
     def __call__(self, params):
+        """
+        Evaluate a TypeRule.
+
+        :param params: A dictionary of content type parameters.  This
+                       dictionary must contain the key '_', which must
+                       be the content type being passed in.
+
+        :returns: A tuple of the final content type and version.
+        """
+
         ctype = (self.ctype % params) if self.ctype else params['_']
         version = (self.version % params) if self.version else None
         return ctype, version
 
 
 class AVersion(object):
+    """
+    A composite application for PasteDeploy-based WSGI stacks which
+    selects the version of an API and the requested content type based
+    on criteria including URI prefix and suffix and content type
+    parameters.
+    """
+
     @staticmethod
     def _parse_type(ctype, typespec):
+        """
+        Parse a content type rule.  Unlike the other rules, content
+        type rules are more complex, since both selected content type
+        and API version must be expressed by one rule.  The rule is
+        split on whitespace, then the components beginning with
+        "type:" and "version:" are selected; in both cases, the text
+        following the ":" character will be treated as a format
+        string, which will be formatted using a content parameter
+        dictionary.
+
+        :param ctype: The content type the rule is for.
+        :param typespec: The rule text, described above.
+
+        :returns: An instance of TypeRule.
+        """
+
         params = {}
         for token in typespec.split():
             tok_type, _sep, tok_val = token.partition(':')
@@ -55,6 +105,18 @@ class AVersion(object):
                         version=params.get('version'))
 
     def __init__(self, loader, global_conf, **local_conf):
+        """
+        Initialize an AVersion object.
+
+        :param loader: An object with a get_app() method, which will
+                       be used to load the actual applications.
+        :param global_conf: The global configuration.  Ignored.
+        :param local_conf: The configuration for this application.
+                           See the README.rst for a full discussion of
+                           the defined keys and the meaning of their
+                           values.
+        """
+
         # Process the configuration
         self.version_app = None
         self.versions = {}
