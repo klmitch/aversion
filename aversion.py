@@ -13,6 +13,11 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import re
+
+
+SLASH_RE = re.compile('/+')
+
 
 class TypeRule(object):
     """
@@ -104,6 +109,19 @@ class AVersion(object):
         return TypeRule(ctype=params.get('type'),
                         version=params.get('version'))
 
+    @staticmethod
+    def _uri_normalize(uri):
+        """
+        Normalize a URI.  Multiple slashes are collapsed into a single
+        '/', a leading '/' is added, and trailing slashes are removed.
+
+        :param uri: The URI to normalize.
+
+        :returns: The normalized URI.
+        """
+
+        return '/' + SLASH_RE.sub('/', uri).strip('/')
+
     def __init__(self, loader, global_conf, **local_conf):
         """
         Initialize an AVersion object.
@@ -132,8 +150,9 @@ class AVersion(object):
                 # The application for a given version
                 self.versions[key[8:]] = loader.get_app(value)
             elif key.startswith('uri.'):
-                # A mapping between URI prefixes and versions
-                uris[key[4:]] = value
+                # A mapping between URI prefixes and versions; note
+                # that the URI is normalized
+                uris[self._uri_normalize(key[4:])] = value
             elif key.startswith('type.'):
                 # A mapping between a passed-in content type and the
                 # desired version and final content type
