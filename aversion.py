@@ -21,6 +21,54 @@ import webob.dec
 SLASH_RE = re.compile('/+')
 
 
+def quoted_split(string, sep):
+    """
+    Split a string on the given separation character, but respecting
+    double-quoted sections of the string.  Returns an iterator.
+
+    :param string: The string to split.
+    :param sep: The character separating sections of the string.
+
+    :returns: An iterator which will iterate over each element of the
+              string separated by the designated separator.
+    """
+
+    # Initialize the algorithm
+    start = None
+    escape = False
+    quote = False
+
+    # Walk through the string
+    for i, c in enumerate(string):
+        # Save the start index
+        if start is None:
+            start = i
+
+        # Handle escape sequences
+        if escape:
+            escape = False
+
+        # Handle quoted strings
+        elif quote:
+            if c == '\\':
+                escape = True
+            elif c == '"':
+                quote = False
+
+        # Handle the separator
+        elif c == sep:
+            yield string[start:i]
+            start = None
+
+        # Handle quotes
+        elif c == '"':
+            quote = True
+
+    # Yield the last part
+    if start is not None:
+        yield string[start:]
+
+
 class TypeRule(object):
     """
     Represents a basic rule for content type interpretation.
