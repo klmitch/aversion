@@ -69,6 +69,65 @@ def quoted_split(string, sep):
         yield string[start:]
 
 
+def unquote(quoted):
+    """
+    Unquotes a value, as drawn from a header.
+
+    Note: This does not use the real unquoting algorithm, but what
+    browsers are actually using for quoting.  Internet Explorer (and
+    probably some other browsers) fails to apply the proper quoting
+    algorithm.  Thus, the algorithm used is simply to remove the
+    quotes.
+
+    :param quoted: The quoted string.
+
+    :returns: The string with the quoting removed.
+    """
+
+    if quoted[:1] == '"' and quoted[-1:] == '"':
+        return quoted[1:-1]
+    return quoted
+
+
+def parse_ctype(ctype):
+    """
+    Parse a content type.
+
+    :param ctype: The content type, with corresponding parameters.
+
+    :returns: A tuple of the content type and a dictionary containing
+              the content type parameters.  The content type will
+              additionally be available in the dictionary as the '_'
+              key.
+    """
+
+    result_ctype = None
+    result = {}
+    for part in quoted_split(ctype, ';'):
+        # Extract the content type first
+        if result_ctype is None:
+            result_ctype = part
+            result['_'] = part
+            continue
+
+        # OK, we have a 'key' or 'key=value' to handle; figure it
+        # out...
+        equal = part.find('=')
+        if equal > 0 and part.find('"', 0, equal) < 0:
+            result[part[:equal]] = unquote(part[equal + 1:])
+        else:
+            # If equal > 0 but it's preceded by a ", it's seriously
+            # messed up, but go ahead and be liberal...
+            result[part] = True
+
+    # If we failed to parse a content type out, return an empty
+    # content type
+    if result_ctype is None:
+        result_ctype = ''
+
+    return result_ctype, result
+
+
 class TypeRule(object):
     """
     Represents a basic rule for content type interpretation.
