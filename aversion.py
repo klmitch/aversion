@@ -15,6 +15,8 @@
 
 import re
 
+import webob.dec
+
 
 SLASH_RE = re.compile('/+')
 
@@ -55,6 +57,51 @@ class TypeRule(object):
         ctype = (self.ctype % params) if self.ctype else params['_']
         version = (self.version % params) if self.version else None
         return ctype, version
+
+
+class Result(object):
+    """
+    Helper class to maintain results for the version and content type
+    selection algorithm.
+    """
+
+    def __init__(self):
+        """
+        Initialize a Result.
+        """
+
+        self.version = None
+        self.ctype = None
+
+    def __nonzero__(self):
+        """
+        Return True only if at least one of the version or content
+        type has not yet been set.
+        """
+
+        return self.version is not None and self.ctype is not None
+
+    def set_version(self, version):
+        """
+        Set the selected version.  Will not override the value of the
+        version if that has already been determined.
+
+        :param version: The version string to set.
+        """
+
+        if self.version is None:
+            self.version = version
+
+    def set_ctype(self, ctype):
+        """
+        Set the selected content type.  Will not override the value of
+        the content type if that has already been determined.
+
+        :param ctype: The content type string to set.
+        """
+
+        if self.ctype is None:
+            self.ctype = ctype
 
 
 class AVersion(object):
@@ -165,3 +212,114 @@ class AVersion(object):
         # We want to search URIs in the correct order
         self.uris = sorted(uris.items(), key=lambda x: len(x[0]),
                            reverse=True)
+
+    @webob.dec.wsgify
+    def __call__(self, request):
+        """
+        Process a WSGI request, selecting the appropriate application
+        to pass the request to.  In addition, if the desired content
+        type can be determined, the Accept header will be altered to
+        match.
+
+        :param request: The Request object provided by WebOb.
+        """
+
+        # Process the request; broken out for easy override and
+        # testing
+        result = self._process(request)
+
+        # Set the Accept header
+        if result.ctype:
+            request.headers['Accept'] = '%s;q=1.0' % result.ctype
+
+        # Select the correct application
+        app = self.versions.get(result.version, self.version_app)
+
+        return request.get_response(app)
+
+    def _process(self, request, result=None):
+        """
+        Process the rules for the request.
+
+        :param request: The Request object provided by WebOb.
+        :param result: The Result object to store the results in.  If
+                       None, one will be allocated.
+
+        :returns: A Result object, containing the selected version and
+                  content type.
+        """
+
+        # Allocate a result and process all the rules
+        result = result if result is not None else Result()
+        self._proc_uri(request, result)
+        self._proc_ctype_header(request, result)
+        self._proc_accept_header(request, result)
+
+        return result
+
+    def _proc_uri(self, request, result):
+        """
+        Process the URI rules for the request.  Both the desired API
+        version and desired content type can be determined from those
+        rules.
+
+        :param request: The Request object provided by WebOb.
+        :param result: The Result object to store the results in.
+        """
+
+        if result:
+            # Result has already been fully determined
+            return
+
+        # First, determine the version based on the URI prefix
+        for prefix, version in self.uris:
+            if (request.path_info == uri or
+                    request.path_info.startswith(uri + '/')):
+                result.set_version(version)
+
+                # Update the request particulars
+                request.script_name += uri
+                request.path_info = request.path_info[len(uri):]
+                if not request.path_info:
+                    request.path_info = '/'
+                break
+
+        # Next, determine the content type based on the URI suffix
+        for format, ctype in self.formats.items():
+            if request.path_info.endswith(format):
+                result.set_ctype(ctype)
+
+                # Update the request particulars
+                request.path_info = request.path_info[:-len(format)]
+                break
+
+    def _proc_ctype_header(self, request, result):
+        """
+        Process the Content-Type header rules for the request.  Only
+        the desired API version can be determined from those rules.
+
+        :param request: The Request object provided by WebOb.
+        :param result: The Result object to store the results in.
+        """
+
+        if result:
+            # Result has already been fully determined
+            return
+
+        pass  # XXX To implement
+
+    def _proc_accept_header(self, request, result):
+        """
+        Process the Accept header rules for the request.  Both the
+        desired API version and content type can be determined from
+        those rules.
+
+        :param request: The Request object provided by WebOb.
+        :param result: The Result object to store the results in.
+        """
+
+        if result:
+            # Result has already been fully determined
+            return
+
+        pass  # XXX To implement
