@@ -128,6 +128,85 @@ def parse_ctype(ctype):
     return result_ctype, result
 
 
+class Accept(object):
+    """
+    Represent an Accept header.
+    """
+
+    def __init__(self, value):
+        """
+        Initialize an Accept object.
+
+        :param value: The value of the Accept header.
+        """
+
+        self.types = [parse_ctype(ctype) for ctype in quoted_split(value, ',')]
+
+    def _match_mask(self, mask, ctype):
+        """
+        Determine if a content type mask matches a given content type.
+
+        :param mask: The content type mask, taken from the Accept
+                     header.
+        :param ctype: The content type to match to the mask.
+        """
+
+        # Handle the simple cases first
+        if '*' not in mask:
+            return ctype == mask
+        elif mask == '*/*':
+            return True
+        elif not mask.endswith('/*'):
+            return False
+
+        mask_major = mask[:-2]
+        ctype_major = ctype.split('/', 1)[0]
+        return ctype_major == mask_major
+
+    def best_match(self, ctypes):
+        """
+        Determine the best content type to use for the request.
+
+        :param ctypes: A list of the available content types.
+
+        :returns: A tuple of the best match content type and the
+                  parameters for that content type.
+        """
+
+        best_q = -1
+        best_ctype = None
+        best_params = {}
+        best_match = '*/*'
+
+        # Walk the list of content types
+        for ctype in ctypes:
+            # Compare to the accept list
+            for ctype_mask, params in self.types:
+                try:
+                    q = float(params.get('q', 1.0))
+                except ValueError:
+                    # Bad quality value
+                    continue
+
+                if q < best_q:
+                    # Not any better
+                    continue
+                elif best_q == q:
+                    # Base on the best match
+                    if best_match.count('*') <= ctype_mask.count('*'):
+                        continue
+
+                # OK, see if we have a match
+                if self._match_mask(ctype_mask, ctype):
+                    best_q = q
+                    best_ctype = ctype
+                    best_params = params
+                    best_match = ctype_mask
+
+        # Return the best match
+        return best_ctype, best_params
+
+
 class TypeRule(object):
     """
     Represents a basic rule for content type interpretation.
