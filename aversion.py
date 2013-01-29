@@ -128,83 +128,72 @@ def parse_ctype(ctype):
     return result_ctype, result
 
 
-class Accept(object):
+def _match_mask(self, mask, ctype):
     """
-    Represent an Accept header.
+    Determine if a content type mask matches a given content type.
+
+    :param mask: The content type mask, taken from the Accept
+                 header.
+    :param ctype: The content type to match to the mask.
     """
 
-    def __init__(self, value):
-        """
-        Initialize an Accept object.
+    # Handle the simple cases first
+    if '*' not in mask:
+        return ctype == mask
+    elif mask == '*/*':
+        return True
+    elif not mask.endswith('/*'):
+        return False
 
-        :param value: The value of the Accept header.
-        """
+    mask_major = mask[:-2]
+    ctype_major = ctype.split('/', 1)[0]
+    return ctype_major == mask_major
 
-        self.types = [parse_ctype(ctype) for ctype in quoted_split(value, ',')]
 
-    def _match_mask(self, mask, ctype):
-        """
-        Determine if a content type mask matches a given content type.
+def best_match(self, requested, allowed):
+    """
+    Determine the best content type to use for the request.
 
-        :param mask: The content type mask, taken from the Accept
-                     header.
-        :param ctype: The content type to match to the mask.
-        """
+    :param ctypes: A list of the available content types.
 
-        # Handle the simple cases first
-        if '*' not in mask:
-            return ctype == mask
-        elif mask == '*/*':
-            return True
-        elif not mask.endswith('/*'):
-            return False
+    :returns: A tuple of the best match content type and the
+              parameters for that content type.
+    """
 
-        mask_major = mask[:-2]
-        ctype_major = ctype.split('/', 1)[0]
-        return ctype_major == mask_major
+    requested = [parse_ctype(ctype) for ctype in quoted_split(requested, ',')]
 
-    def best_match(self, ctypes):
-        """
-        Determine the best content type to use for the request.
+    best_q = -1
+    best_ctype = None
+    best_params = {}
+    best_match = '*/*'
 
-        :param ctypes: A list of the available content types.
+    # Walk the list of content types
+    for ctype in allowed:
+        # Compare to the accept list
+        for ctype_mask, params in requested:
+            try:
+                q = float(params.get('q', 1.0))
+            except ValueError:
+                # Bad quality value
+                continue
 
-        :returns: A tuple of the best match content type and the
-                  parameters for that content type.
-        """
-
-        best_q = -1
-        best_ctype = None
-        best_params = {}
-        best_match = '*/*'
-
-        # Walk the list of content types
-        for ctype in ctypes:
-            # Compare to the accept list
-            for ctype_mask, params in self.types:
-                try:
-                    q = float(params.get('q', 1.0))
-                except ValueError:
-                    # Bad quality value
+            if q < best_q:
+                # Not any better
+                continue
+            elif best_q == q:
+                # Base on the best match
+                if best_match.count('*') <= ctype_mask.count('*'):
                     continue
 
-                if q < best_q:
-                    # Not any better
-                    continue
-                elif best_q == q:
-                    # Base on the best match
-                    if best_match.count('*') <= ctype_mask.count('*'):
-                        continue
+            # OK, see if we have a match
+            if self._match_mask(ctype_mask, ctype):
+                best_q = q
+                best_ctype = ctype
+                best_params = params
+                best_match = ctype_mask
 
-                # OK, see if we have a match
-                if self._match_mask(ctype_mask, ctype):
-                    best_q = q
-                    best_ctype = ctype
-                    best_params = params
-                    best_match = ctype_mask
-
-        # Return the best match
-        return best_ctype, best_params
+    # Return the best match
+    return best_ctype, best_params
 
 
 class TypeRule(object):
