@@ -129,3 +129,43 @@ class MatchMaskTest(unittest2.TestCase):
     def test_otherslashstar_mismatch(self):
         self.assertFalse(aversion._match_mask('a/*', 'e/a'))
         self.assertFalse(aversion._match_mask('e/*', 'a/e'))
+
+
+class BestMatchTest(unittest2.TestCase):
+    def test_empty(self):
+        res_ctype, res_params = aversion.best_match('', ['a/a', 'a/b', 'a/c'])
+
+        self.assertEqual(res_ctype, None)
+        self.assertEqual(res_params, {})
+
+    def test_better_fixed_q(self):
+        requested = '*/*;q=0.7,a/*;q=0.7,a/c;q=0.7'
+        allowed = ['a/a', 'a/b', 'a/c']
+        res_ctype, res_params = aversion.best_match(requested, allowed)
+
+        self.assertEqual(res_ctype, 'a/c')
+        self.assertEqual(res_params, dict(_='a/c', q='0.7'))
+
+    def test_better_incr_q(self):
+        requested = 'a/a;q=0.3,a/b;q=0.5,a/c;q=0.7'
+        allowed = ['a/a', 'a/b', 'a/c']
+        res_ctype, res_params = aversion.best_match(requested, allowed)
+
+        self.assertEqual(res_ctype, 'a/c')
+        self.assertEqual(res_params, dict(_='a/c', q='0.7'))
+
+    def test_better_decr_q(self):
+        requested = 'a/a;q=0.7,a/b;q=0.5,a/c;q=0.3'
+        allowed = ['a/a', 'a/b', 'a/c']
+        res_ctype, res_params = aversion.best_match(requested, allowed)
+
+        self.assertEqual(res_ctype, 'a/a')
+        self.assertEqual(res_params, dict(_='a/a', q='0.7'))
+
+    def test_bad_q(self):
+        requested = 'a/a;q=spam'
+        allowed = ['a/a', 'a/b', 'a/c']
+        res_ctype, res_params = aversion.best_match(requested, allowed)
+
+        self.assertEqual(res_ctype, None)
+        self.assertEqual(res_params, {})
