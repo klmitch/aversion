@@ -169,3 +169,43 @@ class BestMatchTest(unittest2.TestCase):
 
         self.assertEqual(res_ctype, '')
         self.assertEqual(res_params, {})
+
+
+class TypeRuleTest(unittest2.TestCase):
+    def test_init(self):
+        tr = aversion.TypeRule('ctype', 'version')
+
+        self.assertEqual(tr.ctype, 'ctype')
+        self.assertEqual(tr.version, 'version')
+
+    def test_call_fixed(self):
+        tr = aversion.TypeRule('ctype', 'version')
+
+        ctype, version = tr({})
+
+        self.assertEqual(ctype, 'ctype')
+        self.assertEqual(version, 'version')
+
+    def test_call_subs(self):
+        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s')
+
+        ctype, version = tr(dict(ctype='epytc', version='noisrev'))
+
+        self.assertEqual(ctype, 'ctype:epytc')
+        self.assertEqual(version, 'version:noisrev')
+
+    def test_call_defaults(self):
+        tr = aversion.TypeRule(None, None)
+
+        ctype, version = tr(dict(_='ctype/epytc'))
+
+        self.assertEqual(ctype, 'ctype/epytc')
+        self.assertEqual(version, None)
+
+    def test_call_badsubs(self):
+        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s')
+
+        ctype, version = tr({})
+
+        self.assertEqual(ctype, None)
+        self.assertEqual(version, None)
