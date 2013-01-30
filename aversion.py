@@ -261,8 +261,8 @@ class Result(object):
 
     def __nonzero__(self):
         """
-        Return True only if at least one of the version or content
-        type has not yet been set.
+        Return True only when the Result object is completely
+        populated.
         """
 
         return self.version is not None and self.ctype is not None
