@@ -209,3 +209,59 @@ class TypeRuleTest(unittest2.TestCase):
 
         self.assertEqual(ctype, None)
         self.assertEqual(version, None)
+
+
+class ResultTest(unittest2.TestCase):
+    def test_init(self):
+        res = aversion.Result()
+
+        self.assertEqual(res.version, None)
+        self.assertEqual(res.ctype, None)
+
+    def test_nonzero(self):
+        res = aversion.Result()
+
+        self.assertFalse(res)
+
+        res.version = 'version'
+
+        self.assertFalse(res)
+
+        res.version = None
+        res.ctype = 'ctype'
+
+        self.assertFalse(res)
+
+        res.version = 'version'
+
+        self.assertTrue(res)
+
+    def test_set_version_unset(self):
+        res = aversion.Result()
+
+        res.set_version('version')
+
+        self.assertEqual(res.version, 'version')
+
+    def test_set_version_set(self):
+        res = aversion.Result()
+        res.version = 'version'
+
+        res.set_version('noisrev')
+
+        self.assertEqual(res.version, 'version')
+
+    def test_set_ctype_unset(self):
+        res = aversion.Result()
+
+        res.set_ctype('ctype')
+
+        self.assertEqual(res.ctype, 'ctype')
+
+    def test_set_ctype_set(self):
+        res = aversion.Result()
+        res.ctype = 'ctype'
+
+        res.set_ctype('epytc')
+
+        self.assertEqual(res.ctype, 'ctype')
