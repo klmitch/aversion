@@ -538,3 +538,110 @@ class AVersionTest(unittest2.TestCase):
 
         self.assertEqual(result.ctype, None)
         self.assertEqual(result.version, None)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion.Result, 'set_version')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_filled_result(self, mock_parse_ctype,
+                                             mock_set_version, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={'content-type': 'a/b'})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/a': mock.Mock(return_value=('a/c', 'v2'))}
+        result = aversion.Result()
+        result.ctype = 'a/d'
+        result.version = 'v3'
+
+        av._proc_ctype_header(request, result)
+
+        self.assertFalse(mock_set_version.called)
+        self.assertFalse(mock_set_ctype.called)
+        self.assertFalse(mock_parse_ctype.called)
+        self.assertFalse(av.types['a/a'].called)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion.Result, 'set_version')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_no_ctype(self, mock_parse_ctype,
+                                        mock_set_version, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/a': mock.Mock(return_value=('a/c', 'v2'))}
+        result = aversion.Result()
+
+        av._proc_ctype_header(request, result)
+
+        self.assertFalse(mock_set_version.called)
+        self.assertFalse(mock_set_ctype.called)
+        self.assertFalse(mock_parse_ctype.called)
+        self.assertFalse(av.types['a/a'].called)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion.Result, 'set_version')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_missing_ctype(self, mock_parse_ctype,
+                                             mock_set_version, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={'content-type': 'a/b'})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/b': mock.Mock(return_value=('a/c', 'v2'))}
+        result = aversion.Result()
+
+        av._proc_ctype_header(request, result)
+
+        mock_parse_ctype.assert_called_once_with('a/b')
+        self.assertFalse(mock_set_version.called)
+        self.assertFalse(mock_set_ctype.called)
+        self.assertFalse(av.types['a/b'].called)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_basic(self, mock_parse_ctype, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={'content-type': 'a/b'})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/a': mock.Mock(return_value=('a/c', 'v2'))}
+        result = aversion.Result()
+
+        av._proc_ctype_header(request, result)
+
+        mock_parse_ctype.assert_called_once_with('a/b')
+        av.types['a/a'].assert_called_once_with('v1')
+        self.assertEqual(request.headers, {'content-type': 'a/c'})
+        self.assertFalse(mock_set_ctype.called)
+        self.assertEqual(result.version, 'v2')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion.Result, 'set_version')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_nomap(self, mock_parse_ctype,
+                                     mock_set_version, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={'content-type': 'a/b'})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/a': mock.Mock(return_value=('', ''))}
+        result = aversion.Result()
+
+        av._proc_ctype_header(request, result)
+
+        mock_parse_ctype.assert_called_once_with('a/b')
+        av.types['a/a'].assert_called_once_with('v1')
+        self.assertEqual(request.headers, {'content-type': 'a/b'})
+        self.assertFalse(mock_set_version.called)
+        self.assertFalse(mock_set_ctype.called)
