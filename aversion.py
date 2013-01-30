@@ -492,10 +492,6 @@ class AVersion(object):
             # Result has already been fully determined
             return
 
-        # If this isn't a POST or PUT, skip it...
-        if request.method not in ('POST', 'PUT'):
-            return
-
         try:
             ctype = request.headers['content-type']
         except KeyError:
