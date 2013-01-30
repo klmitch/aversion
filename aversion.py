@@ -17,6 +17,7 @@ import logging
 import re
 
 import webob.dec
+import webob.exc
 
 
 LOG = logging.getLogger('aversion')
@@ -424,7 +425,11 @@ class AVersion(object):
         # Select the correct application
         app = self.versions.get(result.version, self.version_app)
 
-        return request.get_response(app)
+        if app:
+            return request.get_response(app)
+        else:
+            return webob.exc.HTTPInternalServerError(
+                explanation='Cannot determine application to serve request')
 
     def _process(self, request, result=None):
         """
