@@ -474,3 +474,67 @@ class AVersionTest(unittest2.TestCase):
         mock_proc_ctype_header.assert_called_once_with('request', 'result')
         mock_proc_accept_header.assert_called_once_with('request', 'result')
         self.assertEqual(result, 'result')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion.Result, 'set_version')
+    def test_proc_uri_filled_result(self, mock_set_version, mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(path_info='/v1/.a', script_name='')
+        av = aversion.AVersion(loader, {})
+        av.uris = [('/v1', 'v1')]
+        av.formats = {'.a': 'a/a'}
+        result = aversion.Result()
+        result.ctype = 'a/b'
+        result.version = 'v2'
+
+        av._proc_uri(request, result)
+
+        self.assertFalse(mock_set_version.called)
+        self.assertFalse(mock_set_ctype.called)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    def test_proc_uri_basic(self):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(path_info='/v1/.a', script_name='')
+        av = aversion.AVersion(loader, {})
+        av.uris = [('/v1', 'v1')]
+        av.formats = {'.a': 'a/a'}
+        result = aversion.Result()
+
+        av._proc_uri(request, result)
+
+        self.assertEqual(result.ctype, 'a/a')
+        self.assertEqual(result.version, 'v1')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    def test_proc_uri_empties_uri(self):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(path_info='/v1', script_name='')
+        av = aversion.AVersion(loader, {})
+        av.uris = [('/v1', 'v1')]
+        av.formats = {'.a': 'a/a'}
+        result = aversion.Result()
+
+        av._proc_uri(request, result)
+
+        self.assertEqual(result.ctype, None)
+        self.assertEqual(result.version, 'v1')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    def test_proc_uri_nomatch(self):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(path_info='/v2/.b', script_name='')
+        av = aversion.AVersion(loader, {})
+        av.uris = [('/v1', 'v1')]
+        av.formats = {'.a': 'a/a'}
+        result = aversion.Result()
+
+        av._proc_uri(request, result)
+
+        self.assertEqual(result.ctype, None)
+        self.assertEqual(result.version, None)
