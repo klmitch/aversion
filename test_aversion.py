@@ -311,3 +311,10 @@ class ParseTypeRuleTest(unittest2.TestCase):
         mock_warn.assert_called_once_with(
             "ctype: Duplicate value for token type 'type'")
         mock_TypeRule.assert_called_once_with(ctype='baz', version=None)
+
+
+class UriNormalizeTest(unittest2.TestCase):
+    def test_uri_normalize(self):
+        result = aversion._uri_normalize('///foo////bar////baz////')
+
+        self.assertEqual(result, '/foo/bar/baz')
