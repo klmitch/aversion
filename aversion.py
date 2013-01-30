@@ -128,7 +128,7 @@ def parse_ctype(ctype):
     return result_ctype, result
 
 
-def _match_mask(self, mask, ctype):
+def _match_mask(mask, ctype):
     """
     Determine if a content type mask matches a given content type.
 
@@ -150,7 +150,7 @@ def _match_mask(self, mask, ctype):
     return ctype_major == mask_major
 
 
-def best_match(self, requested, allowed):
+def best_match(requested, allowed):
     """
     Determine the best content type to use for the request.
 
