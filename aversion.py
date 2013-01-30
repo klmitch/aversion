@@ -299,7 +299,7 @@ class AVersion(object):
     """
 
     @staticmethod
-    def _parse_type(ctype, typespec):
+    def _parse_type_rule(ctype, typespec):
         """
         Parse a content type rule.  Unlike the other rules, content
         type rules are more complex, since both selected content type
@@ -389,7 +389,7 @@ class AVersion(object):
             elif key.startswith('type.'):
                 # A mapping between a passed-in content type and the
                 # desired version and final content type
-                types[key[5:]] = self._parse_type(key[5:], value)
+                types[key[5:]] = self._parse_type_rule(key[5:], value)
             elif key[0] == '.':
                 # A mapping between a file extension and the desired
                 # content type
