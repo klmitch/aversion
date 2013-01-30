@@ -105,3 +105,27 @@ class ParseCtypeTest(unittest2.TestCase):
 
         self.assertEqual(res_ctype, '')
         self.assertEqual(res_params, {})
+
+
+class MatchMaskTest(unittest2.TestCase):
+    def test_equal(self):
+        self.assertTrue(aversion._match_mask('a/e', 'a/e'))
+
+    def test_notequal(self):
+        self.assertFalse(aversion._match_mask('a/e', 'e/a'))
+
+    def test_starslashstar(self):
+        self.assertTrue(aversion._match_mask('*/*', 'a/e'))
+        self.assertTrue(aversion._match_mask('*/*', 'e/a'))
+
+    def test_starslashother(self):
+        self.assertFalse(aversion._match_mask('*/e', 'a/e'))
+        self.assertFalse(aversion._match_mask('*/e', 'e/a'))
+
+    def test_otherslashstar_match(self):
+        self.assertTrue(aversion._match_mask('a/*', 'a/e'))
+        self.assertTrue(aversion._match_mask('e/*', 'e/a'))
+
+    def test_otherslashstar_mismatch(self):
+        self.assertFalse(aversion._match_mask('a/*', 'e/a'))
+        self.assertFalse(aversion._match_mask('e/*', 'a/e'))
