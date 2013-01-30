@@ -13,10 +13,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import logging
 import re
 
 import webob.dec
 
+
+LOG = logging.getLogger('aversion')
 
 SLASH_RE = re.compile('/+')
 
