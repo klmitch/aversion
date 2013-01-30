@@ -265,3 +265,49 @@ class ResultTest(unittest2.TestCase):
         res.set_ctype('epytc')
 
         self.assertEqual(res.ctype, 'ctype')
+
+
+class ParseTypeRuleTest(unittest2.TestCase):
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_invalid_rule(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'value')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Invalid type token 'value'")
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_unknown_token_type(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'value:bar')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Unrecognized token type 'value'")
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_bad_token_value(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'type:bar')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Unrecognized token value 'bar'")
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_token_parsing(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'type:"bar" version:"baz"')
+
+        self.assertFalse(mock_warn.called)
+        mock_TypeRule.assert_called_once_with(ctype='bar', version='baz')
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_token_parsing_duplicate(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'type:"bar" type:"baz"')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Duplicate value for token type 'type'")
+        mock_TypeRule.assert_called_once_with(ctype='baz', version=None)
