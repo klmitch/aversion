@@ -16,6 +16,8 @@
 import mock
 import unittest2
 
+import webob.exc
+
 import aversion
 
 
@@ -318,3 +320,157 @@ class UriNormalizeTest(unittest2.TestCase):
         result = aversion._uri_normalize('///foo////bar////baz////')
 
         self.assertEqual(result, '/foo/bar/baz')
+
+
+class AVersionTest(unittest2.TestCase):
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    def test_init_empty(self):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        av = aversion.AVersion(loader, {})
+
+        self.assertEqual(av.version_app, None)
+        self.assertEqual(av.versions, {})
+        self.assertEqual(av.types, {})
+        self.assertEqual(av.formats, {})
+        self.assertEqual(av.uris, [])
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    def test_init(self):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        conf = {
+            'version': 'vers_app',
+            'version.v1': 'vers_v1',
+            'version.v2': 'vers_v2',
+            'uri.///v1.0//': 'v1',
+            'uri.//v2////': 'v2',
+            'type.a/a': 'type:"%(_)s" version:"v2"',
+            'type.a/b': 'version:"v1"',
+            'type.a/c': 'type:"a/a"',
+            '.a': 'a/a',
+            '.b': 'a/b',
+            'ignored': 'ignored',
+        }
+
+        av = aversion.AVersion(loader, {}, **conf)
+
+        self.assertEqual(av.version_app, 'vers_app')
+        self.assertEqual(av.versions, dict(v1='vers_v1', v2='vers_v2'))
+        self.assertEqual(av.types, {
+            'a/a': ('%(_)s', 'v2'),
+            'a/b': (None, 'v1'),
+            'a/c': ('a/a', None),
+        })
+        self.assertEqual(av.formats, {
+            '.a': 'a/a',
+            '.b': 'a/b',
+        })
+        self.assertEqual(av.uris, [
+            ('/v1.0', 'v1'),
+            ('/v2', 'v2'),
+        ])
+        loader.assert_has_calls([
+            mock.call.get_app('vers_app'),
+            mock.call.get_app('vers_v1'),
+            mock.call.get_app('vers_v2'),
+        ], any_order=True)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.AVersion, '_process',
+                       return_value=mock.Mock(ctype=None, version=None))
+    def test_call_noapp(self, mock_process):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={})
+        av = aversion.AVersion(loader, {})
+
+        result = av(request)
+
+        mock_process.assert_called_once_with(request)
+        self.assertFalse(request.get_response.called)
+        self.assertIsInstance(result, webob.exc.HTTPInternalServerError)
+        self.assertEqual(request.headers, {})
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.AVersion, '_process',
+                       return_value=mock.Mock(ctype='a/a', version='v1'))
+    def test_call_app_fallback(self, mock_process):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(**{
+            'headers': {},
+            'get_response.return_value': 'response',
+        })
+        av = aversion.AVersion(loader, {})
+        av.version_app = 'fallback'
+        av.versions = dict(v2='version2')
+
+        result = av(request)
+
+        mock_process.assert_called_once_with(request)
+        request.get_response.assert_called_once_with('fallback')
+        self.assertEqual(result, 'response')
+        self.assertEqual(request.headers, {'Accept': 'a/a;q=1.0'})
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.AVersion, '_process',
+                       return_value=mock.Mock(ctype='a/a', version='v1'))
+    def test_call_app_selected(self, mock_process):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(**{
+            'headers': {},
+            'get_response.return_value': 'response',
+        })
+        av = aversion.AVersion(loader, {})
+        av.version_app = 'fallback'
+        av.versions = dict(v1='version1')
+
+        result = av(request)
+
+        mock_process.assert_called_once_with(request)
+        request.get_response.assert_called_once_with('version1')
+        self.assertEqual(result, 'response')
+        self.assertEqual(request.headers, {'Accept': 'a/a;q=1.0'})
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'Result', return_value='result')
+    @mock.patch.object(aversion.AVersion, '_proc_uri')
+    @mock.patch.object(aversion.AVersion, '_proc_ctype_header')
+    @mock.patch.object(aversion.AVersion, '_proc_accept_header')
+    def test_process_with_result(self, mock_proc_accept_header,
+                                 mock_proc_ctype_header, mock_proc_uri,
+                                 mock_Result):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        av = aversion.AVersion(loader, {})
+
+        result = av._process('request', '')
+
+        self.assertFalse(mock_Result.called)
+        mock_proc_uri.assert_called_once_with('request', '')
+        mock_proc_ctype_header.assert_called_once_with('request', '')
+        mock_proc_accept_header.assert_called_once_with('request', '')
+        self.assertEqual(result, '')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'Result', return_value='result')
+    @mock.patch.object(aversion.AVersion, '_proc_uri')
+    @mock.patch.object(aversion.AVersion, '_proc_ctype_header')
+    @mock.patch.object(aversion.AVersion, '_proc_accept_header')
+    def test_process_without_result(self, mock_proc_accept_header,
+                                    mock_proc_ctype_header, mock_proc_uri,
+                                    mock_Result):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        av = aversion.AVersion(loader, {})
+
+        result = av._process('request')
+
+        mock_Result.assert_called_once_with()
+        mock_proc_uri.assert_called_once_with('request', 'result')
+        mock_proc_ctype_header.assert_called_once_with('request', 'result')
+        mock_proc_accept_header.assert_called_once_with('request', 'result')
+        self.assertEqual(result, 'result')
