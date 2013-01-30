@@ -290,6 +290,62 @@ class Result(object):
             self.ctype = ctype
 
 
+def _parse_type_rule(ctype, typespec):
+    """
+    Parse a content type rule.  Unlike the other rules, content type
+    rules are more complex, since both selected content type and API
+    version must be expressed by one rule.  The rule is split on
+    whitespace, then the components beginning with "type:" and
+    "version:" are selected; in both cases, the text following the ":"
+    character will be treated as a format string, which will be
+    formatted using a content parameter dictionary.
+
+    :param ctype: The content type the rule is for.
+    :param typespec: The rule text, described above.
+
+    :returns: An instance of TypeRule.
+    """
+
+    params = {}
+    for token in typespec.split():
+        tok_type, _sep, tok_val = token.partition(':')
+
+        # Validate the token type
+        if not tok_val:
+            LOG.warn("%s: Invalid type token %r" % (ctype, token))
+            continue
+        elif tok_type not in ('type', 'version'):
+            LOG.warn("%s: Unrecognized token type %r" % (ctype, tok_type))
+            continue
+        elif tok_type in params:
+            LOG.warn("%s: Duplicate value for token type %r" %
+                     (ctype, tok_type))
+            # Allow the overwrite
+
+        # Validate the token value
+        if (len(tok_val) <= 2 or tok_val[0] not in ('"', "'") or
+                tok_val[0] != tok_val[-1]):
+            LOG.warn("Unrecognized token value %r" % tok_val)
+
+        params[tok_type] = tok_val[1:-1]
+
+    return TypeRule(ctype=params.get('type'),
+                    version=params.get('version'))
+
+
+def _uri_normalize(uri):
+    """
+    Normalize a URI.  Multiple slashes are collapsed into a single
+    '/', a leading '/' is added, and trailing slashes are removed.
+
+    :param uri: The URI to normalize.
+
+    :returns: The normalized URI.
+    """
+
+    return '/' + SLASH_RE.sub('/', uri).strip('/')
+
+
 class AVersion(object):
     """
     A composite application for PasteDeploy-based WSGI stacks which
@@ -297,63 +353,6 @@ class AVersion(object):
     on criteria including URI prefix and suffix and content type
     parameters.
     """
-
-    @staticmethod
-    def _parse_type_rule(ctype, typespec):
-        """
-        Parse a content type rule.  Unlike the other rules, content
-        type rules are more complex, since both selected content type
-        and API version must be expressed by one rule.  The rule is
-        split on whitespace, then the components beginning with
-        "type:" and "version:" are selected; in both cases, the text
-        following the ":" character will be treated as a format
-        string, which will be formatted using a content parameter
-        dictionary.
-
-        :param ctype: The content type the rule is for.
-        :param typespec: The rule text, described above.
-
-        :returns: An instance of TypeRule.
-        """
-
-        params = {}
-        for token in typespec.split():
-            tok_type, _sep, tok_val = token.partition(':')
-
-            # Validate the token type
-            if not tok_val:
-                LOG.warn("%s: Invalid type token %r" % (ctype, token))
-                continue
-            elif tok_type not in ('type', 'version'):
-                LOG.warn("%s: Unrecognized token type %r" % (ctype, tok_type))
-                continue
-            elif tok_type in params:
-                LOG.warn("%s: Duplicate value for token type %r" %
-                         (ctype, tok_type))
-                # Allow the overwrite
-
-            # Validate the token value
-            if (len(tok_val) <= 2 or tok_val[0] not in ('"', "'") or
-                    tok_val[0] != tok_val[-1]):
-                LOG.warn("Unrecognized token value %r" % tok_val)
-
-            params[tok_type] = tok_val[1:-1]
-
-        return TypeRule(ctype=params.get('type'),
-                        version=params.get('version'))
-
-    @staticmethod
-    def _uri_normalize(uri):
-        """
-        Normalize a URI.  Multiple slashes are collapsed into a single
-        '/', a leading '/' is added, and trailing slashes are removed.
-
-        :param uri: The URI to normalize.
-
-        :returns: The normalized URI.
-        """
-
-        return '/' + SLASH_RE.sub('/', uri).strip('/')
 
     def __init__(self, loader, global_conf, **local_conf):
         """
@@ -385,11 +384,11 @@ class AVersion(object):
             elif key.startswith('uri.'):
                 # A mapping between URI prefixes and versions; note
                 # that the URI is normalized
-                uris[self._uri_normalize(key[4:])] = value
+                uris[_uri_normalize(key[4:])] = value
             elif key.startswith('type.'):
                 # A mapping between a passed-in content type and the
                 # desired version and final content type
-                types[key[5:]] = self._parse_type_rule(key[5:], value)
+                types[key[5:]] = _parse_type_rule(key[5:], value)
             elif key[0] == '.':
                 # A mapping between a file extension and the desired
                 # content type
