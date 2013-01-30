@@ -546,7 +546,7 @@ class AVersion(object):
         ctype, params = best_match(accept, self.types.keys())
 
         # Is it a recognized content type?
-        if not ctype:
+        if ctype not in self.types:
             return
 
         # Get the mapped ctype and version
