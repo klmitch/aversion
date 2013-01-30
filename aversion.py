@@ -328,7 +328,7 @@ def _parse_type_rule(ctype, typespec):
         # Validate the token value
         if (len(tok_val) <= 2 or tok_val[0] not in ('"', "'") or
                 tok_val[0] != tok_val[-1]):
-            LOG.warn("Unrecognized token value %r" % tok_val)
+            LOG.warn("%s: Unrecognized token value %r" % (ctype, tok_val))
 
         params[tok_type] = tok_val[1:-1]
 
