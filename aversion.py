@@ -163,7 +163,7 @@ def best_match(requested, allowed):
     requested = [parse_ctype(ctype) for ctype in quoted_split(requested, ',')]
 
     best_q = -1
-    best_ctype = None
+    best_ctype = ''
     best_params = {}
     best_match = '*/*'
 

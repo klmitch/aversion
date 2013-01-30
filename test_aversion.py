@@ -135,7 +135,7 @@ class BestMatchTest(unittest2.TestCase):
     def test_empty(self):
         res_ctype, res_params = aversion.best_match('', ['a/a', 'a/b', 'a/c'])
 
-        self.assertEqual(res_ctype, None)
+        self.assertEqual(res_ctype, '')
         self.assertEqual(res_params, {})
 
     def test_better_fixed_q(self):
@@ -167,5 +167,5 @@ class BestMatchTest(unittest2.TestCase):
         allowed = ['a/a', 'a/b', 'a/c']
         res_ctype, res_params = aversion.best_match(requested, allowed)
 
-        self.assertEqual(res_ctype, None)
+        self.assertEqual(res_ctype, '')
         self.assertEqual(res_params, {})
