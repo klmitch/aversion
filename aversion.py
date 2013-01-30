@@ -229,8 +229,19 @@ class TypeRule(object):
         :returns: A tuple of the final content type and version.
         """
 
-        ctype = (self.ctype % params) if self.ctype else params['_']
-        version = (self.version % params) if self.version else None
+        # Determine the desired content type
+        try:
+            ctype = (self.ctype % params) if self.ctype else params['_']
+        except KeyError:
+            # Treat it as undefined rather than defaulted
+            ctype = None
+
+        # Determine the desired version
+        try:
+            version = (self.version % params) if self.version else None
+        except KeyError:
+            version = None
+
         return ctype, version
 
 
