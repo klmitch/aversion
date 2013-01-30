@@ -492,7 +492,31 @@ class AVersion(object):
             # Result has already been fully determined
             return
 
-        pass  # XXX To implement
+        # If this isn't a POST or PUT, skip it...
+        if request.method not in ('POST', 'PUT'):
+            return
+
+        try:
+            ctype = request.headers['content-type']
+        except KeyError:
+            # No content-type header to examine
+            return
+
+        # Parse the content type
+        ctype, params = parse_ctype(ctype)
+
+        # Is it a recognized content type?
+        if ctype not in self.types:
+            return
+
+        # Get the mapped ctype and version
+        mapped_ctype, mapped_version = self.types[ctype](params)
+
+        # Update the content type header and set the version
+        if mapped_ctype:
+            request.headers['content-type'] = mapped_ctype
+        if mapped_version:
+            result.set_version(mapped_version)
 
     def _proc_accept_header(self, request, result):
         """
@@ -508,4 +532,24 @@ class AVersion(object):
             # Result has already been fully determined
             return
 
-        pass  # XXX To implement
+        try:
+            accept = request.headers['accept']
+        except KeyError:
+            # No Accept header to examine
+            return
+
+        # Obtain the best-match content type and its parameters
+        ctype, params = best_match(accept, self.types.keys())
+
+        # Is it a recognized content type?
+        if not ctype:
+            return
+
+        # Get the mapped ctype and version
+        mapped_ctype, mapped_version = self.types[ctype](params)
+
+        # Set the content type and version
+        if mapped_ctype:
+            result.set_ctype(mapped_ctype)
+        if mapped_version:
+            result.set_version(mapped_version)
