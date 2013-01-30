@@ -83,3 +83,25 @@ class UnquoteTest(unittest2.TestCase):
         result = aversion.unquote('"te"st"')
 
         self.assertEqual(result, 'te"st')
+
+
+class ParseCtypeTest(unittest2.TestCase):
+    def test_parse_ctype(self):
+        ctype = 'application/example;a;b=;c=foo;d="bar";e"=baz"'
+        res_ctype, res_params = aversion.parse_ctype(ctype)
+
+        self.assertEqual(res_ctype, 'application/example')
+        self.assertEqual(res_params, {
+            'a': True,
+            'b': '',
+            'c': 'foo',
+            'd': 'bar',
+            'e"=baz"': True,
+            '_': 'application/example',
+        })
+
+    def test_none(self):
+        res_ctype, res_params = aversion.parse_ctype('')
+
+        self.assertEqual(res_ctype, '')
+        self.assertEqual(res_params, {})
