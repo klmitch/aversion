@@ -186,7 +186,7 @@ def best_match(requested, allowed):
                     continue
 
             # OK, see if we have a match
-            if self._match_mask(ctype_mask, ctype):
+            if _match_mask(ctype_mask, ctype):
                 best_q = q
                 best_ctype = ctype
                 best_params = params
