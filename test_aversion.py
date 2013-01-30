@@ -51,3 +51,35 @@ class QuotedSplitTest(unittest2.TestCase):
             'q=1',
             'version="2;3\\""',
         ])
+
+
+class UnquoteTest(unittest2.TestCase):
+    def test_unquote_noquotes(self):
+        result = aversion.unquote('test')
+
+        self.assertEqual(result, 'test')
+
+    def test_unquote_empty(self):
+        result = aversion.unquote('')
+
+        self.assertEqual(result, '')
+
+    def test_unquote_onequote(self):
+        result = aversion.unquote('"')
+
+        self.assertEqual(result, '')
+
+    def test_unquote_twoquote(self):
+        result = aversion.unquote('""')
+
+        self.assertEqual(result, '')
+
+    def test_unquote_quoted(self):
+        result = aversion.unquote('"test"')
+
+        self.assertEqual(result, 'test')
+
+    def test_unquote_quoted_embedded(self):
+        result = aversion.unquote('"te"st"')
+
+        self.assertEqual(result, 'te"st')
