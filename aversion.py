@@ -381,7 +381,7 @@ class AVersion(object):
             if key == 'version':
                 # The version application--what we call if no version
                 # is specified
-                version_app = loader.get_app(value)
+                self.version_app = loader.get_app(value)
             elif key.startswith('version.'):
                 # The application for a given version
                 self.versions[key[8:]] = loader.get_app(value)
@@ -392,11 +392,11 @@ class AVersion(object):
             elif key.startswith('type.'):
                 # A mapping between a passed-in content type and the
                 # desired version and final content type
-                types[key[5:]] = _parse_type_rule(key[5:], value)
+                self.types[key[5:]] = _parse_type_rule(key[5:], value)
             elif key[0] == '.':
                 # A mapping between a file extension and the desired
                 # content type
-                formats[key] = value
+                self.formats[key] = value
 
         # We want to search URIs in the correct order
         self.uris = sorted(uris.items(), key=lambda x: len(x[0]),
