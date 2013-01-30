@@ -467,13 +467,13 @@ class AVersion(object):
 
         # First, determine the version based on the URI prefix
         for prefix, version in self.uris:
-            if (request.path_info == uri or
-                    request.path_info.startswith(uri + '/')):
+            if (request.path_info == prefix or
+                    request.path_info.startswith(prefix + '/')):
                 result.set_version(version)
 
                 # Update the request particulars
-                request.script_name += uri
-                request.path_info = request.path_info[len(uri):]
+                request.script_name += prefix
+                request.path_info = request.path_info[len(prefix):]
                 if not request.path_info:
                     request.path_info = '/'
                 break
