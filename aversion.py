@@ -262,6 +262,7 @@ class Result(object):
 
         self.version = None
         self.ctype = None
+        self.orig_ctype = None
 
     def __nonzero__(self):
         """
@@ -269,7 +270,8 @@ class Result(object):
         populated.
         """
 
-        return self.version is not None and self.ctype is not None
+        return (self.version is not None and self.ctype is not None and
+                self.orig_ctype is not None)
 
     def set_version(self, version):
         """
@@ -282,16 +284,20 @@ class Result(object):
         if self.version is None:
             self.version = version
 
-    def set_ctype(self, ctype):
+    def set_ctype(self, ctype, orig_ctype=None):
         """
         Set the selected content type.  Will not override the value of
         the content type if that has already been determined.
 
         :param ctype: The content type string to set.
+
+        :param orig_ctype: The original content type, as found in the
+                           configuration.
         """
 
         if self.ctype is None:
             self.ctype = ctype
+            self.orig_ctype = orig_ctype
 
 
 def _parse_type_rule(ctype, typespec):
@@ -420,10 +426,18 @@ class AVersion(object):
 
         # Set the Accept header
         if result.ctype:
-            request.headers['Accept'] = '%s;q=1.0' % result.ctype
+            request.environ['aversion.response_type'] = result.ctype
+            request.environ['aversion.orig_response_type'] = result.orig_ctype
+            request.environ['aversion.accept'] = request.headers['accept']
+            request.headers['accept'] = '%s;q=1.0' % result.ctype
 
         # Select the correct application
-        app = self.versions.get(result.version, self.version_app)
+        try:
+            app = self.versions[result.version]
+            request.environ['aversion.version'] = result.version
+        except KeyError:
+            app = self.version_app
+            request.environ['aversion.version'] = None
 
         if app:
             return request.get_response(app)
@@ -518,6 +532,10 @@ class AVersion(object):
 
         # Update the content type header and set the version
         if mapped_ctype:
+            request.environ['aversion.request_type'] = mapped_ctype
+            request.environ['aversion.orig_request_type'] = ctype
+            request.environ['aversion.content-type'] = \
+                request.headers['content-type']
             request.headers['content-type'] = mapped_ctype
         if mapped_version:
             result.set_version(mapped_version)
@@ -554,6 +572,6 @@ class AVersion(object):
 
         # Set the content type and version
         if mapped_ctype:
-            result.set_ctype(mapped_ctype)
+            result.set_ctype(mapped_ctype, ctype)
         if mapped_version:
             result.set_version(mapped_version)
