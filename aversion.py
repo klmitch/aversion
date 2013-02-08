@@ -475,7 +475,7 @@ class AVersion(object):
         if result.ctype:
             request.environ['aversion.response_type'] = result.ctype
             request.environ['aversion.orig_response_type'] = result.orig_ctype
-            request.environ['aversion.accept'] = request.headers['accept']
+            request.environ['aversion.accept'] = request.headers.get('accept')
             if self.overwrite_headers:
                 request.headers['accept'] = '%s;q=1.0' % result.ctype
 
