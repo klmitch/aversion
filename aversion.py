@@ -482,7 +482,7 @@ class AVersion(object):
 
         # Determine the requested version; allows mapping through
         # aliases to a canonical value
-        version = self.aliases.get(request.version, request.version)
+        version = self.aliases.get(result.version, result.version)
 
         # Select the correct application
         try:
