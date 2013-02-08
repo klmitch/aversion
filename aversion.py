@@ -271,8 +271,7 @@ class Result(object):
         populated.
         """
 
-        return (self.version is not None and self.ctype is not None and
-                self.orig_ctype is not None)
+        return self.version is not None and self.ctype is not None
 
     def set_version(self, version):
         """
