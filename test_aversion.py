@@ -219,6 +219,7 @@ class ResultTest(unittest2.TestCase):
 
         self.assertEqual(res.version, None)
         self.assertEqual(res.ctype, None)
+        self.assertEqual(res.orig_ctype, None)
 
     def test_nonzero(self):
         res = aversion.Result()
@@ -259,14 +260,25 @@ class ResultTest(unittest2.TestCase):
         res.set_ctype('ctype')
 
         self.assertEqual(res.ctype, 'ctype')
+        self.assertEqual(res.orig_ctype, None)
+
+    def test_set_ctype_orig_unset(self):
+        res = aversion.Result()
+
+        res.set_ctype('ctype', 'orig')
+
+        self.assertEqual(res.ctype, 'ctype')
+        self.assertEqual(res.orig_ctype, 'orig')
 
     def test_set_ctype_set(self):
         res = aversion.Result()
         res.ctype = 'ctype'
+        res.orig_ctype = 'orig'
 
-        res.set_ctype('epytc')
+        res.set_ctype('epytc', 'giro')
 
         self.assertEqual(res.ctype, 'ctype')
+        self.assertEqual(res.orig_ctype, 'orig')
 
 
 class ParseTypeRuleTest(unittest2.TestCase):
