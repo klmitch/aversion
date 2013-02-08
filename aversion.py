@@ -317,7 +317,10 @@ def _parse_type_rule(ctype, typespec):
     """
 
     params = {}
-    for token in typespec.split():
+    for token in quoted_split(typespec, ' '):
+        if not token:
+            continue
+
         tok_type, _sep, tok_val = token.partition(':')
 
         # Validate the token type

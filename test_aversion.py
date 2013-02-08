@@ -312,7 +312,7 @@ class ParseTypeRuleTest(unittest2.TestCase):
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
     def test_token_parsing(self, mock_TypeRule, mock_warn):
-        rule = aversion._parse_type_rule('ctype', 'type:"bar" version:"baz"')
+        rule = aversion._parse_type_rule('ctype', 'type:"bar"  version:"baz"')
 
         self.assertFalse(mock_warn.called)
         mock_TypeRule.assert_called_once_with(ctype='bar', version='baz')
