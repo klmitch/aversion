@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import copy
 import logging
 import re
 
@@ -427,6 +428,31 @@ class AVersion(object):
         self.uris = sorted(uris.items(), key=lambda x: len(x[0]),
                            reverse=True)
 
+        # The versioning application may find it useful to have some
+        # introspection on the AVersion configuration, so build up a
+        # couple of data structures we can add to requests.  We start
+        # with a mapping of versions to URI prefixes...
+        version_map = {}
+        for prefix, version in uris.items():
+            version_map.setdefault(version, [])
+            version_map[version].append(prefix)
+
+        # Next, set up a list of type information
+        types = dict((ctype, dict(name=ctype)) for ctype in self.types)
+
+        # Add in information about the formats
+        for suffix, ctype in self.formats.items():
+            types.setdefault(ctype, dict(name=ctype))
+            types[ctype]['suffix'] = suffix
+
+        # Now, build the config dictionary tree we will pass to
+        # requests
+        self.config = dict(
+            versions=version_map,
+            aliases=self.aliases,
+            types=types,
+        )
+
     @webob.dec.wsgify
     def __call__(self, request):
         """
@@ -441,6 +467,10 @@ class AVersion(object):
         # Process the request; broken out for easy override and
         # testing
         result = self._process(request)
+
+        # Add the config to the environment; we use a deep copy to
+        # avoid accidental overwrite of the data
+        request.environ['aversion.config'] = copy.deepcopy(self.config)
 
         # Set the Accept header
         if result.ctype:
