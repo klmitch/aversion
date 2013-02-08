@@ -207,7 +207,7 @@ class TypeRule(object):
     Represents a basic rule for content type interpretation.
     """
 
-    def __init__(self, ctype, version):
+    def __init__(self, ctype, version, params):
         """
         Initialize a TypeRule object.
 
@@ -219,10 +219,15 @@ class TypeRule(object):
                         will be returned; otherwise, the version will
                         be formed by formatting the string, using the
                         parameter dictionary.
+        :param params: Extra parameters.  These are unused by
+                       AVersion, but are included in the configuration
+                       made available through the 'aversion.config'
+                       WSGI environment variable.
         """
 
         self.ctype = ctype
         self.version = version
+        self.params = params
 
     def __call__(self, params):
         """
@@ -309,7 +314,10 @@ def _parse_type_rule(ctype, typespec):
     whitespace, then the components beginning with "type:" and
     "version:" are selected; in both cases, the text following the ":"
     character will be treated as a format string, which will be
-    formatted using a content parameter dictionary.
+    formatted using a content parameter dictionary.  Components
+    beginning with "param:" specify key="quoted value" pairs that
+    specify parameters; these parameters are ignored by AVersion, but
+    may be used by the application.
 
     :param ctype: The content type the rule is for.
     :param typespec: The rule text, described above.
@@ -317,7 +325,7 @@ def _parse_type_rule(ctype, typespec):
     :returns: An instance of TypeRule.
     """
 
-    params = {}
+    params = {'param': {}}
     for token in quoted_split(typespec, ' ', quotes='"\''):
         if not token:
             continue
@@ -328,10 +336,32 @@ def _parse_type_rule(ctype, typespec):
         if not tok_val:
             LOG.warn("%s: Invalid type token %r" % (ctype, token))
             continue
-        elif tok_type not in ('type', 'version'):
+        elif tok_type not in ('type', 'version', 'param'):
             LOG.warn("%s: Unrecognized token type %r" % (ctype, tok_type))
             continue
-        elif tok_type in params:
+
+        # Intercept 'param' clauses
+        if tok_type == 'param':
+            key, _eq, value = tok_val.partition('=')
+
+            if key in params['param']:
+                LOG.warn("%s: Duplicate value for parameter %r" %
+                         (ctype, key))
+                # Allow the overwrite
+
+            # Demand the value be quoted
+            if (len(value) <= 2 or value[0] not in ('"', "'") or
+                    value[0] != value[-1]):
+                LOG.warn("%s: Invalid parameter value %r for parameter %r" %
+                         (ctype, value, key))
+                continue
+
+            # Save the parameter and move on
+            params['param'][key] = value[1:-1]
+            continue
+
+        # Check for duplicates
+        if tok_type in params:
             LOG.warn("%s: Duplicate value for token type %r" %
                      (ctype, tok_type))
             # Allow the overwrite
@@ -345,7 +375,8 @@ def _parse_type_rule(ctype, typespec):
         params[tok_type] = tok_val[1:-1]
 
     return TypeRule(ctype=params.get('type'),
-                    version=params.get('version'))
+                    version=params.get('version'),
+                    params=params['param'])
 
 
 def _uri_normalize(uri):
@@ -441,11 +472,12 @@ class AVersion(object):
             version_map[version].append(prefix)
 
         # Next, set up a list of type information
-        types = dict((ctype, dict(name=ctype)) for ctype in self.types)
+        types = dict((ctype, dict(name=ctype, params=rule.params))
+                     for ctype, rule in self.types.items())
 
         # Add in information about the formats
         for suffix, ctype in self.formats.items():
-            types.setdefault(ctype, dict(name=ctype))
+            types.setdefault(ctype, dict(name=ctype, params={}))
             types[ctype]['suffix'] = suffix
 
         # Now, build the config dictionary tree we will pass to

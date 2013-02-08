@@ -13,12 +13,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import collections
+
 import mock
 import unittest2
-
 import webob.exc
 
 import aversion
+
+
+FakeTypeRule = collections.namedtuple('FakeTypeRule',
+                                      ['ctype', 'version', 'params'])
 
 
 class QuotedSplitTest(unittest2.TestCase):
@@ -175,13 +180,14 @@ class BestMatchTest(unittest2.TestCase):
 
 class TypeRuleTest(unittest2.TestCase):
     def test_init(self):
-        tr = aversion.TypeRule('ctype', 'version')
+        tr = aversion.TypeRule('ctype', 'version', 'params')
 
         self.assertEqual(tr.ctype, 'ctype')
         self.assertEqual(tr.version, 'version')
+        self.assertEqual(tr.params, 'params')
 
     def test_call_fixed(self):
-        tr = aversion.TypeRule('ctype', 'version')
+        tr = aversion.TypeRule('ctype', 'version', None)
 
         ctype, version = tr({})
 
@@ -189,7 +195,7 @@ class TypeRuleTest(unittest2.TestCase):
         self.assertEqual(version, 'version')
 
     def test_call_subs(self):
-        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s')
+        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s', None)
 
         ctype, version = tr(dict(ctype='epytc', version='noisrev'))
 
@@ -197,7 +203,7 @@ class TypeRuleTest(unittest2.TestCase):
         self.assertEqual(version, 'version:noisrev')
 
     def test_call_defaults(self):
-        tr = aversion.TypeRule(None, None)
+        tr = aversion.TypeRule(None, None, None)
 
         ctype, version = tr(dict(_='ctype/epytc'))
 
@@ -205,7 +211,7 @@ class TypeRuleTest(unittest2.TestCase):
         self.assertEqual(version, None)
 
     def test_call_badsubs(self):
-        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s')
+        tr = aversion.TypeRule('ctype:%(ctype)s', 'version:%(version)s', None)
 
         ctype, version = tr({})
 
@@ -289,7 +295,8 @@ class ParseTypeRuleTest(unittest2.TestCase):
 
         mock_warn.assert_called_once_with(
             "ctype: Invalid type token 'value'")
-        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None,
+                                              params={})
 
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
@@ -298,7 +305,8 @@ class ParseTypeRuleTest(unittest2.TestCase):
 
         mock_warn.assert_called_once_with(
             "ctype: Unrecognized token type 'value'")
-        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None,
+                                              params={})
 
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
@@ -307,15 +315,19 @@ class ParseTypeRuleTest(unittest2.TestCase):
 
         mock_warn.assert_called_once_with(
             "ctype: Unrecognized token value 'bar'")
-        mock_TypeRule.assert_called_once_with(ctype=None, version=None)
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None,
+                                              params={})
 
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
     def test_token_parsing(self, mock_TypeRule, mock_warn):
-        rule = aversion._parse_type_rule('ctype', 'type:"bar"  version:"baz"')
+        rule = aversion._parse_type_rule('ctype', 'type:"bar"  version:"baz" '
+                                         'param:foo="one" param:bar="two"')
 
         self.assertFalse(mock_warn.called)
-        mock_TypeRule.assert_called_once_with(ctype='bar', version='baz')
+        mock_TypeRule.assert_called_once_with(ctype='bar', version='baz',
+                                              params=dict(foo='one',
+                                                          bar='two'))
 
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
@@ -324,7 +336,29 @@ class ParseTypeRuleTest(unittest2.TestCase):
 
         mock_warn.assert_called_once_with(
             "ctype: Duplicate value for token type 'type'")
-        mock_TypeRule.assert_called_once_with(ctype='baz', version=None)
+        mock_TypeRule.assert_called_once_with(ctype='baz', version=None,
+                                              params={})
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_bad_param_value(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype', 'param:foo=bar')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Invalid parameter value 'bar' for parameter 'foo'")
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None,
+                                              params={})
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    @mock.patch.object(aversion, 'TypeRule')
+    def test_duplicate_param(self, mock_TypeRule, mock_warn):
+        rule = aversion._parse_type_rule('ctype',
+                                         'param:foo="one" param:foo="two"')
+
+        mock_warn.assert_called_once_with(
+            "ctype: Duplicate value for parameter 'foo'")
+        mock_TypeRule.assert_called_once_with(ctype=None, version=None,
+                                              params=dict(foo='two'))
 
 
 class UriNormalizeTest(unittest2.TestCase):
@@ -335,8 +369,7 @@ class UriNormalizeTest(unittest2.TestCase):
 
 
 class AVersionTest(unittest2.TestCase):
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     def test_init_empty(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
 
@@ -355,8 +388,7 @@ class AVersionTest(unittest2.TestCase):
             'types': {},
         })
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     def test_init(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
         conf = {
@@ -382,9 +414,9 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(av.versions, dict(v1='vers_v1', v2='vers_v2'))
         self.assertEqual(av.aliases, {'v1.1': 'v2'})
         self.assertEqual(av.types, {
-            'a/a': ('%(_)s', 'v2'),
-            'a/b': (None, 'v1'),
-            'a/c': ('a/a', None),
+            'a/a': ('%(_)s', 'v2', {}),
+            'a/b': (None, 'v1', {}),
+            'a/c': ('a/a', None, {}),
         })
         self.assertEqual(av.formats, {
             '.a': 'a/a',
@@ -398,9 +430,9 @@ class AVersionTest(unittest2.TestCase):
             'versions': dict(v1=['/v1.0'], v2=['/v2']),
             'aliases': {'v1.1': 'v2'},
             'types': {
-                'a/a': dict(name='a/a', suffix='.a'),
-                'a/b': dict(name='a/b', suffix='.b'),
-                'a/c': dict(name='a/c'),
+                'a/a': dict(name='a/a', params={}, suffix='.a'),
+                'a/b': dict(name='a/b', params={}, suffix='.b'),
+                'a/c': dict(name='a/c', params={}),
             },
         })
         loader.assert_has_calls([
@@ -409,8 +441,7 @@ class AVersionTest(unittest2.TestCase):
             mock.call.get_app('vers_v2'),
         ], any_order=True)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.LOG, 'warn')
     def test_init_overwrite_headers(self, mock_warn):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
@@ -440,8 +471,7 @@ class AVersionTest(unittest2.TestCase):
             "Unrecognized value 'fals' for configuration key "
             "'overwrite_headers'")
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.AVersion, '_process',
                        return_value=mock.Mock(ctype=None, version=None))
     def test_call_noapp(self, mock_process):
@@ -464,8 +494,7 @@ class AVersionTest(unittest2.TestCase):
             'aversion.version': None,
         })
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.AVersion, '_process',
                        return_value=mock.Mock(ctype='a/a', version='v1',
                                               orig_ctype='a/b'))
@@ -498,8 +527,7 @@ class AVersionTest(unittest2.TestCase):
             'aversion.accept': None,
         })
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.AVersion, '_process',
                        return_value=mock.Mock(ctype='a/a', version='v1',
                                               orig_ctype='a/b'))
@@ -532,8 +560,7 @@ class AVersionTest(unittest2.TestCase):
             'aversion.accept': None,
         })
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.AVersion, '_process',
                        return_value=mock.Mock(ctype='a/a', version='v1',
                                               orig_ctype='a/b'))
@@ -567,8 +594,7 @@ class AVersionTest(unittest2.TestCase):
             'aversion.accept': None,
         })
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion, 'Result', return_value='result')
     @mock.patch.object(aversion.AVersion, '_proc_uri')
     @mock.patch.object(aversion.AVersion, '_proc_ctype_header')
@@ -587,8 +613,7 @@ class AVersionTest(unittest2.TestCase):
         mock_proc_accept_header.assert_called_once_with('request', '')
         self.assertEqual(result, '')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion, 'Result', return_value='result')
     @mock.patch.object(aversion.AVersion, '_proc_uri')
     @mock.patch.object(aversion.AVersion, '_proc_ctype_header')
@@ -607,8 +632,7 @@ class AVersionTest(unittest2.TestCase):
         mock_proc_accept_header.assert_called_once_with('request', 'result')
         self.assertEqual(result, 'result')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     def test_proc_uri_filled_result(self, mock_set_version, mock_set_ctype):
@@ -626,8 +650,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_version.called)
         self.assertFalse(mock_set_ctype.called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     def test_proc_uri_basic(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
         request = mock.Mock(path_info='/v1/.a', script_name='')
@@ -641,8 +664,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(result.ctype, 'a/a')
         self.assertEqual(result.version, 'v1')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     def test_proc_uri_empties_uri(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
         request = mock.Mock(path_info='/v1', script_name='')
@@ -656,8 +678,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(result.ctype, None)
         self.assertEqual(result.version, 'v1')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     def test_proc_uri_nomatch(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
         request = mock.Mock(path_info='/v2/.b', script_name='')
@@ -671,8 +692,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(result.ctype, None)
         self.assertEqual(result.version, None)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'parse_ctype',
@@ -695,8 +715,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(av.types['a/a'].called)
         self.assertEqual(request.environ, {})
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'parse_ctype',
@@ -716,8 +735,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_parse_ctype.called)
         self.assertFalse(av.types['a/a'].called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'parse_ctype',
@@ -737,8 +755,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_ctype.called)
         self.assertFalse(av.types['a/b'].called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion, 'parse_ctype',
                        return_value=('a/a', 'v1'))
@@ -762,8 +779,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_ctype.called)
         self.assertEqual(result.version, 'v2')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion, 'parse_ctype',
                        return_value=('a/a', 'v1'))
@@ -789,8 +805,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_ctype.called)
         self.assertEqual(result.version, 'v2')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'parse_ctype',
@@ -811,8 +826,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_version.called)
         self.assertFalse(mock_set_ctype.called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'best_match',
@@ -835,8 +849,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_best_match.called)
         self.assertFalse(av.types['a/a'].called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'best_match',
@@ -856,8 +869,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_best_match.called)
         self.assertFalse(av.types['a/a'].called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'best_match',
@@ -878,8 +890,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertFalse(mock_set_ctype.called)
         self.assertFalse(av.types['a/b'].called)
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion, 'best_match',
                        return_value=('a/a', 'v1'))
     def test_proc_accept_header_basic(self, mock_best_match):
@@ -896,8 +907,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(result.ctype, 'a/c')
         self.assertEqual(result.version, 'v2')
 
-    @mock.patch.object(aversion, 'TypeRule',
-                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
     @mock.patch.object(aversion.Result, 'set_ctype')
     @mock.patch.object(aversion.Result, 'set_version')
     @mock.patch.object(aversion, 'best_match',
