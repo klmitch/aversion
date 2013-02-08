@@ -379,6 +379,7 @@ class AVersion(object):
         """
 
         # Process the configuration
+        self.overwrite_headers = True
         self.version_app = None
         self.versions = {}
         self.aliases = {}
@@ -390,6 +391,19 @@ class AVersion(object):
                 # The version application--what we call if no version
                 # is specified
                 self.version_app = loader.get_app(value)
+            elif key == 'overwrite_headers':
+                # Alter whether or not we overwrite the headers
+                value = value.lower()
+                if value in ('true', 't', 'on', 'yes', 'enable'):
+                    self.overwrite_headers = True
+                elif value in ('false', 'f', 'off', 'no', 'disable'):
+                    self.overwrite_headers = False
+                else:
+                    try:
+                        self.overwrite_headers = bool(int(value))
+                    except ValueError:
+                        LOG.warn("Unrecognized value %r for configuration "
+                                 "key overwrite_headers" % value)
             elif key.startswith('version.'):
                 # The application for a given version
                 self.versions[key[8:]] = loader.get_app(value)
@@ -433,7 +447,8 @@ class AVersion(object):
             request.environ['aversion.response_type'] = result.ctype
             request.environ['aversion.orig_response_type'] = result.orig_ctype
             request.environ['aversion.accept'] = request.headers['accept']
-            request.headers['accept'] = '%s;q=1.0' % result.ctype
+            if self.overwrite_headers:
+                request.headers['accept'] = '%s;q=1.0' % result.ctype
 
         # Determine the requested version; allows mapping through
         # aliases to a canonical value
@@ -544,7 +559,8 @@ class AVersion(object):
             request.environ['aversion.orig_request_type'] = ctype
             request.environ['aversion.content-type'] = \
                 request.headers['content-type']
-            request.headers['content-type'] = mapped_ctype
+            if self.overwrite_headers:
+                request.headers['content-type'] = mapped_ctype
         if mapped_version:
             result.set_version(mapped_version)
 
