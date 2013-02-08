@@ -381,6 +381,7 @@ class AVersion(object):
         # Process the configuration
         self.version_app = None
         self.versions = {}
+        self.aliases = {}
         uris = {}
         self.types = {}
         self.formats = {}
@@ -392,6 +393,9 @@ class AVersion(object):
             elif key.startswith('version.'):
                 # The application for a given version
                 self.versions[key[8:]] = loader.get_app(value)
+            elif key.startswith('alias.'):
+                # An alias for a given version
+                self.aliases[key[6:]] = value
             elif key.startswith('uri.'):
                 # A mapping between URI prefixes and versions; note
                 # that the URI is normalized
@@ -431,10 +435,14 @@ class AVersion(object):
             request.environ['aversion.accept'] = request.headers['accept']
             request.headers['accept'] = '%s;q=1.0' % result.ctype
 
+        # Determine the requested version; allows mapping through
+        # aliases to a canonical value
+        version = self.aliases.get(request.version, request.version)
+
         # Select the correct application
         try:
-            app = self.versions[result.version]
-            request.environ['aversion.version'] = result.version
+            app = self.versions[version]
+            request.environ['aversion.version'] = version
         except KeyError:
             app = self.version_app
             request.environ['aversion.version'] = None
