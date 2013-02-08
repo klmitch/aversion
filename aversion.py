@@ -403,7 +403,7 @@ class AVersion(object):
                         self.overwrite_headers = bool(int(value))
                     except ValueError:
                         LOG.warn("Unrecognized value %r for configuration "
-                                 "key overwrite_headers" % value)
+                                 "key 'overwrite_headers'" % value)
             elif key.startswith('version.'):
                 # The application for a given version
                 self.versions[key[8:]] = loader.get_app(value)
