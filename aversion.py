@@ -26,13 +26,14 @@ LOG = logging.getLogger('aversion')
 SLASH_RE = re.compile('/+')
 
 
-def quoted_split(string, sep):
+def quoted_split(string, sep, quotes='"'):
     """
     Split a string on the given separation character, but respecting
     double-quoted sections of the string.  Returns an iterator.
 
     :param string: The string to split.
     :param sep: The character separating sections of the string.
+    :param quotes: A string specifying all legal quote characters.
 
     :returns: An iterator which will iterate over each element of the
               string separated by the designated separator.
@@ -57,7 +58,7 @@ def quoted_split(string, sep):
         elif quote:
             if c == '\\':
                 escape = True
-            elif c == '"':
+            elif c == quote:
                 quote = False
 
         # Handle the separator
@@ -66,8 +67,8 @@ def quoted_split(string, sep):
             start = None
 
         # Handle quotes
-        elif c == '"':
-            quote = True
+        elif c in quotes:
+            quote = c
 
     # Yield the last part
     if start is not None:
@@ -317,7 +318,7 @@ def _parse_type_rule(ctype, typespec):
     """
 
     params = {}
-    for token in quoted_split(typespec, ' '):
+    for token in quoted_split(typespec, ' ', quotes='"\''):
         if not token:
             continue
 
