@@ -342,20 +342,29 @@ class AVersionTest(unittest2.TestCase):
 
         av = aversion.AVersion(loader, {})
 
+        self.assertEqual(av.overwrite_headers, True)
         self.assertEqual(av.version_app, None)
         self.assertEqual(av.versions, {})
+        self.assertEqual(av.aliases, {})
         self.assertEqual(av.types, {})
         self.assertEqual(av.formats, {})
         self.assertEqual(av.uris, [])
+        self.assertEqual(av.config, {
+            'versions': {},
+            'aliases': {},
+            'types': {},
+        })
 
     @mock.patch.object(aversion, 'TypeRule',
                        lambda **kw: (kw['ctype'], kw['version']))
     def test_init(self):
         loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
         conf = {
+            'overwrite_headers': 'false',
             'version': 'vers_app',
             'version.v1': 'vers_v1',
             'version.v2': 'vers_v2',
+            'alias.v1.1': 'v2',
             'uri.///v1.0//': 'v1',
             'uri.//v2////': 'v2',
             'type.a/a': 'type:"%(_)s" version:"v2"',
@@ -368,8 +377,10 @@ class AVersionTest(unittest2.TestCase):
 
         av = aversion.AVersion(loader, {}, **conf)
 
+        self.assertEqual(av.overwrite_headers, False)
         self.assertEqual(av.version_app, 'vers_app')
         self.assertEqual(av.versions, dict(v1='vers_v1', v2='vers_v2'))
+        self.assertEqual(av.aliases, {'v1.1': 'v2'})
         self.assertEqual(av.types, {
             'a/a': ('%(_)s', 'v2'),
             'a/b': (None, 'v1'),
@@ -383,11 +394,51 @@ class AVersionTest(unittest2.TestCase):
             ('/v1.0', 'v1'),
             ('/v2', 'v2'),
         ])
+        self.assertEqual(av.config, {
+            'versions': dict(v1=['/v1.0'], v2=['/v2']),
+            'aliases': {'v1.1': 'v2'},
+            'types': {
+                'a/a': dict(name='a/a', suffix='.a'),
+                'a/b': dict(name='a/b', suffix='.b'),
+                'a/c': dict(name='a/c'),
+            },
+        })
         loader.assert_has_calls([
             mock.call.get_app('vers_app'),
             mock.call.get_app('vers_v1'),
             mock.call.get_app('vers_v2'),
         ], any_order=True)
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_init_overwrite_headers(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        trials = {
+            'true': True,
+            'tRuE': True,
+            't': True,
+            'on': True,
+            'yes': True,
+            'enable': True,
+            'false': False,
+            'fAlSe': False,
+            'off': False,
+            'no': False,
+            'disable': False,
+            '0': False,
+            '1': True,
+            '1000': True,
+            'fals': True,
+        }
+
+        for value, expected in trials.items():
+            av = aversion.AVersion(loader, {}, overwrite_headers=value)
+            self.assertEqual(av.overwrite_headers, expected)
+
+        mock_warn.assert_called_once_with(
+            "Unrecognized value 'fals' for configuration key "
+            "'overwrite_headers'")
 
     @mock.patch.object(aversion, 'TypeRule',
                        lambda **kw: (kw['ctype'], kw['version']))
@@ -469,6 +520,41 @@ class AVersionTest(unittest2.TestCase):
         request.get_response.assert_called_once_with('version1')
         self.assertEqual(result, 'response')
         self.assertEqual(request.headers, {'accept': 'a/a;q=1.0'})
+        self.assertEqual(request.environ, {
+            'aversion.config': {
+                'versions': {},
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.version': 'v1',
+            'aversion.response_type': 'a/a',
+            'aversion.orig_response_type': 'a/b',
+            'aversion.accept': None,
+        })
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.AVersion, '_process',
+                       return_value=mock.Mock(ctype='a/a', version='v1',
+                                              orig_ctype='a/b'))
+    def test_call_app_selected_nooverwrite(self, mock_process):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(**{
+            'headers': {},
+            'environ': {},
+            'get_response.return_value': 'response',
+        })
+        av = aversion.AVersion(loader, {})
+        av.version_app = 'fallback'
+        av.versions = dict(v1='version1')
+        av.overwrite_headers = False
+
+        result = av(request)
+
+        mock_process.assert_called_once_with(request)
+        request.get_response.assert_called_once_with('version1')
+        self.assertEqual(result, 'response')
+        self.assertEqual(request.headers, {})
         self.assertEqual(request.environ, {
             'aversion.config': {
                 'versions': {},
@@ -668,6 +754,33 @@ class AVersionTest(unittest2.TestCase):
         mock_parse_ctype.assert_called_once_with('a/b')
         av.types['a/a'].assert_called_once_with('v1')
         self.assertEqual(request.headers, {'content-type': 'a/c'})
+        self.assertEqual(request.environ, {
+            'aversion.request_type': 'a/c',
+            'aversion.orig_request_type': 'a/a',
+            'aversion.content-type': 'a/b',
+        })
+        self.assertFalse(mock_set_ctype.called)
+        self.assertEqual(result.version, 'v2')
+
+    @mock.patch.object(aversion, 'TypeRule',
+                       lambda **kw: (kw['ctype'], kw['version']))
+    @mock.patch.object(aversion.Result, 'set_ctype')
+    @mock.patch.object(aversion, 'parse_ctype',
+                       return_value=('a/a', 'v1'))
+    def test_proc_ctype_header_basic_nooverwrite(self, mock_parse_ctype,
+                                                 mock_set_ctype):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(headers={'content-type': 'a/b'}, environ={})
+        av = aversion.AVersion(loader, {})
+        av.types = {'a/a': mock.Mock(return_value=('a/c', 'v2'))}
+        av.overwrite_headers = False
+        result = aversion.Result()
+
+        av._proc_ctype_header(request, result)
+
+        mock_parse_ctype.assert_called_once_with('a/b')
+        av.types['a/a'].assert_called_once_with('v1')
+        self.assertEqual(request.headers, {'content-type': 'a/b'})
         self.assertEqual(request.environ, {
             'aversion.request_type': 'a/c',
             'aversion.orig_request_type': 'a/a',
