@@ -287,6 +287,70 @@ class ResultTest(unittest2.TestCase):
         self.assertEqual(res.orig_ctype, 'orig')
 
 
+class ParseVersionRuleTest(unittest2.TestCase):
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_invalid_rule(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        self.assertRaises(ImportError, aversion._parse_version_rule, loader,
+                          'v1', '')
+        self.assertFalse(loader.get_app.called)
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_no_params(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        result = aversion._parse_version_rule(loader, 'v1', 'api_v1')
+
+        self.assertEqual(result, dict(app='api_v1', name='v1', params={}))
+        loader.get_app.assert_called_once_with('api_v1')
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_bad_parameter(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        result = aversion._parse_version_rule(loader, 'v1',
+                                              'api_v1 foo=one')
+
+        self.assertEqual(result, dict(app='api_v1', name='v1', params={}))
+        loader.get_app.assert_called_once_with('api_v1')
+        mock_warn.assert_called_once_with(
+            "v1: Invalid parameter value 'one' for parameter 'foo'")
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_full_parse(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        result = aversion._parse_version_rule(loader, 'v1',
+                                              'api_v1 foo="one"  bar="two"')
+
+        self.assertEqual(result, dict(
+            app='api_v1',
+            name='v1',
+            params=dict(foo='one', bar='two'),
+        ))
+        loader.get_app.assert_called_once_with('api_v1')
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_duplicate_parameter(self, mock_warn):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+
+        result = aversion._parse_version_rule(loader, 'v1',
+                                              'api_v1 foo="one" foo="two"')
+
+        self.assertEqual(result, dict(
+            app='api_v1',
+            name='v1',
+            params=dict(foo='two'),
+        ))
+        loader.get_app.assert_called_once_with('api_v1')
+        mock_warn.assert_called_once_with(
+            "v1: Duplicate value for parameter 'foo'")
+
+
 class ParseTypeRuleTest(unittest2.TestCase):
     @mock.patch.object(aversion.LOG, 'warn')
     @mock.patch.object(aversion, 'TypeRule')
@@ -399,6 +463,7 @@ class AVersionTest(unittest2.TestCase):
             'alias.v1.1': 'v2',
             'uri.///v1.0//': 'v1',
             'uri.//v2////': 'v2',
+            'uri.//v3///': 'v3',
             'type.a/a': 'type:"%(_)s" version:"v2"',
             'type.a/b': 'version:"v1"',
             'type.a/c': 'type:"a/a"',
@@ -411,7 +476,20 @@ class AVersionTest(unittest2.TestCase):
 
         self.assertEqual(av.overwrite_headers, False)
         self.assertEqual(av.version_app, 'vers_app')
-        self.assertEqual(av.versions, dict(v1='vers_v1', v2='vers_v2'))
+        self.assertEqual(av.versions, {
+            'v1': {
+                'app': 'vers_v1',
+                'name': 'v1',
+                'prefixes': ['/v1.0'],
+                'params': {},
+            },
+            'v2': {
+                'app': 'vers_v2',
+                'name': 'v2',
+                'prefixes': ['/v2'],
+                'params': {},
+            },
+        })
         self.assertEqual(av.aliases, {'v1.1': 'v2'})
         self.assertEqual(av.types, {
             'a/a': ('%(_)s', 'v2', {}),
@@ -425,9 +503,23 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(av.uris, [
             ('/v1.0', 'v1'),
             ('/v2', 'v2'),
+            ('/v3', 'v3'),
         ])
         self.assertEqual(av.config, {
-            'versions': dict(v1=['/v1.0'], v2=['/v2']),
+            'versions': {
+                'v1': {
+                    'app': 'vers_v1',
+                    'name': 'v1',
+                    'prefixes': ['/v1.0'],
+                    'params': {},
+                },
+                'v2': {
+                    'app': 'vers_v2',
+                    'name': 'v2',
+                    'prefixes': ['/v2'],
+                    'params': {},
+                },
+            },
             'aliases': {'v1.1': 'v2'},
             'types': {
                 'a/a': dict(name='a/a', params={}, suffix='.a'),
@@ -507,7 +599,7 @@ class AVersionTest(unittest2.TestCase):
         })
         av = aversion.AVersion(loader, {})
         av.version_app = 'fallback'
-        av.versions = dict(v2='version2')
+        av.versions = dict(v2=dict(app='version2'))
 
         result = av(request)
 
@@ -540,7 +632,7 @@ class AVersionTest(unittest2.TestCase):
         })
         av = aversion.AVersion(loader, {})
         av.version_app = 'fallback'
-        av.versions = dict(v1='version1')
+        av.versions = dict(v1=dict(app='version1'))
 
         result = av(request)
 
@@ -573,7 +665,7 @@ class AVersionTest(unittest2.TestCase):
         })
         av = aversion.AVersion(loader, {})
         av.version_app = 'fallback'
-        av.versions = dict(v1='version1')
+        av.versions = dict(v1=dict(app='version1'))
         av.overwrite_headers = False
 
         result = av(request)

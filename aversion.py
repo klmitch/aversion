@@ -306,6 +306,59 @@ class Result(object):
             self.orig_ctype = orig_ctype
 
 
+def _parse_version_rule(loader, version, verspec):
+    """
+    Parse a version rule.  The first token is the name of the
+    application implementing that API version.  The remaining tokens
+    are key="quoted value" pairs that specify parameters; these
+    parameters are ignored by AVersion, but may be used by the
+    application.
+
+    :param loader: An object with a get_app() method, which will be
+                   used to load the actual applications.
+    :param version: The version name.
+    :param verspec: The version text, described above.
+
+    :returns: A dictionary of three keys: "app" is the application;
+              "name" is the version identification string; and
+              "params" is a dictionary of parameters.
+    """
+
+    result = dict(name=version, params={})
+    for token in quoted_split(verspec, ' ', quotes='"\''):
+        if not token:
+            continue
+
+        # Convert the application
+        if 'app' not in result:
+            result['app'] = loader.get_app(token)
+            continue
+
+        # What remains is key="quoted value" pairs...
+        key, _eq, value = token.partition('=')
+
+        if key in result['params']:
+            LOG.warn("%s: Duplicate value for parameter %r" %
+                     (version, key))
+            # Allow the overwrite
+
+        # Demand the value be quoted
+        if (len(value) <= 2 or value[0] not in ('"', "'") or
+                value[0] != value[-1]):
+            LOG.warn("%s: Invalid parameter value %r for parameter %r" %
+                     (version, value, key))
+            continue
+
+        # Save the parameter
+        result['params'][key] = value[1:-1]
+
+    # Make sure we have an application
+    if 'app' not in result:
+        raise ImportError("Cannot load application for version %r" % version)
+
+    return result
+
+
 def _parse_type_rule(ctype, typespec):
     """
     Parse a content type rule.  Unlike the other rules, content type
@@ -441,7 +494,8 @@ class AVersion(object):
                                  "key 'overwrite_headers'" % value)
             elif key.startswith('version.'):
                 # The application for a given version
-                self.versions[key[8:]] = loader.get_app(value)
+                self.versions[key[8:]] = _parse_version_rule(loader, key[8:],
+                                                             value)
             elif key.startswith('alias.'):
                 # An alias for a given version
                 self.aliases[key[6:]] = value
@@ -465,11 +519,14 @@ class AVersion(object):
         # The versioning application may find it useful to have some
         # introspection on the AVersion configuration, so build up a
         # couple of data structures we can add to requests.  We start
-        # with a mapping of versions to URI prefixes...
-        version_map = {}
+        # with adding URI prefixes to the version descriptors...
         for prefix, version in uris.items():
-            version_map.setdefault(version, [])
-            version_map[version].append(prefix)
+            if version not in self.versions:
+                continue
+
+            # Add the prefixes to the version descriptor
+            self.versions[version].setdefault('prefixes', [])
+            self.versions[version]['prefixes'].append(prefix)
 
         # Next, set up a list of type information
         types = dict((ctype, dict(name=ctype, params=rule.params))
@@ -483,7 +540,7 @@ class AVersion(object):
         # Now, build the config dictionary tree we will pass to
         # requests
         self.config = dict(
-            versions=version_map,
+            versions=self.versions,
             aliases=self.aliases,
             types=types,
         )
@@ -521,7 +578,7 @@ class AVersion(object):
 
         # Select the correct application
         try:
-            app = self.versions[version]
+            app = self.versions[version]['app']
             request.environ['aversion.version'] = version
         except KeyError:
             app = self.version_app
