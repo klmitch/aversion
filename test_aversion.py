@@ -287,6 +287,34 @@ class ResultTest(unittest2.TestCase):
         self.assertEqual(res.orig_ctype, 'orig')
 
 
+class SetKeyTest(unittest2.TestCase):
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_duplicate(self, mock_warn):
+        result = dict(foo='one')
+        aversion._set_key("pfx", result, 'foo', '"two"', 'bar')
+
+        self.assertEqual(result, dict(foo='two'))
+        mock_warn.assert_called_once_with(
+            "pfx: Duplicate value for bar 'foo'")
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_unquoted(self, mock_warn):
+        result = {}
+        aversion._set_key("pfx", result, 'foo', 'one', 'bar')
+
+        self.assertEqual(result, {})
+        mock_warn.assert_called_once_with(
+            "pfx: Invalid value 'one' for bar 'foo'")
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_noerror(self, mock_warn):
+        result = {}
+        aversion._set_key("pfx", result, 'foo', '"one"', 'bar')
+
+        self.assertEqual(result, dict(foo='one'))
+        self.assertFalse(mock_warn.called)
+
+
 class ParseVersionRuleTest(unittest2.TestCase):
     @mock.patch.object(aversion.LOG, 'warn')
     def test_invalid_rule(self, mock_warn):
@@ -317,7 +345,7 @@ class ParseVersionRuleTest(unittest2.TestCase):
         self.assertEqual(result, dict(app='api_v1', name='v1', params={}))
         loader.get_app.assert_called_once_with('api_v1')
         mock_warn.assert_called_once_with(
-            "v1: Invalid parameter value 'one' for parameter 'foo'")
+            "version.v1: Invalid value 'one' for parameter 'foo'")
 
     @mock.patch.object(aversion.LOG, 'warn')
     def test_full_parse(self, mock_warn):
@@ -348,7 +376,52 @@ class ParseVersionRuleTest(unittest2.TestCase):
         ))
         loader.get_app.assert_called_once_with('api_v1')
         mock_warn.assert_called_once_with(
-            "v1: Duplicate value for parameter 'foo'")
+            "version.v1: Duplicate value for parameter 'foo'")
+
+
+class ParseAliasRuleTest(unittest2.TestCase):
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_invalid_rule(self, mock_warn):
+        self.assertRaises(KeyError, aversion._parse_alias_rule, 'v1.1', '')
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_no_params(self, mock_warn):
+        result = aversion._parse_alias_rule('v1.1', 'v2')
+
+        self.assertEqual(result, dict(alias='v1.1', version='v2', params={}))
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_bad_parameter(self, mock_warn):
+        result = aversion._parse_alias_rule('v1.1', 'v2 foo=one')
+
+        self.assertEqual(result, dict(alias='v1.1', version='v2', params={}))
+        mock_warn.assert_called_once_with(
+            "alias.v1.1: Invalid value 'one' for parameter 'foo'")
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_full_parse(self, mock_warn):
+        result = aversion._parse_alias_rule('v1.1', 'v2 foo="one"  bar="two"')
+
+        self.assertEqual(result, dict(
+            alias='v1.1',
+            version='v2',
+            params=dict(foo='one', bar='two'),
+        ))
+        self.assertFalse(mock_warn.called)
+
+    @mock.patch.object(aversion.LOG, 'warn')
+    def test_duplicate_parameter(self, mock_warn):
+        result = aversion._parse_alias_rule('v1.1', 'v2 foo="one" foo="two"')
+
+        self.assertEqual(result, dict(
+            alias='v1.1',
+            version='v2',
+            params=dict(foo='two'),
+        ))
+        mock_warn.assert_called_once_with(
+            "alias.v1.1: Duplicate value for parameter 'foo'")
 
 
 class ParseTypeRuleTest(unittest2.TestCase):
@@ -378,7 +451,7 @@ class ParseTypeRuleTest(unittest2.TestCase):
         rule = aversion._parse_type_rule('ctype', 'type:bar')
 
         mock_warn.assert_called_once_with(
-            "ctype: Unrecognized token value 'bar'")
+            "type.ctype: Invalid value 'bar' for token type 'type'")
         mock_TypeRule.assert_called_once_with(ctype=None, version=None,
                                               params={})
 
@@ -399,7 +472,7 @@ class ParseTypeRuleTest(unittest2.TestCase):
         rule = aversion._parse_type_rule('ctype', 'type:"bar" type:"baz"')
 
         mock_warn.assert_called_once_with(
-            "ctype: Duplicate value for token type 'type'")
+            "type.ctype: Duplicate value for token type 'type'")
         mock_TypeRule.assert_called_once_with(ctype='baz', version=None,
                                               params={})
 
@@ -409,7 +482,7 @@ class ParseTypeRuleTest(unittest2.TestCase):
         rule = aversion._parse_type_rule('ctype', 'param:foo=bar')
 
         mock_warn.assert_called_once_with(
-            "ctype: Invalid parameter value 'bar' for parameter 'foo'")
+            "type.ctype: Invalid value 'bar' for parameter 'foo'")
         mock_TypeRule.assert_called_once_with(ctype=None, version=None,
                                               params={})
 
@@ -420,7 +493,7 @@ class ParseTypeRuleTest(unittest2.TestCase):
                                          'param:foo="one" param:foo="two"')
 
         mock_warn.assert_called_once_with(
-            "ctype: Duplicate value for parameter 'foo'")
+            "type.ctype: Duplicate value for parameter 'foo'")
         mock_TypeRule.assert_called_once_with(ctype=None, version=None,
                                               params=dict(foo='two'))
 
@@ -490,7 +563,13 @@ class AVersionTest(unittest2.TestCase):
                 'params': {},
             },
         })
-        self.assertEqual(av.aliases, {'v1.1': 'v2'})
+        self.assertEqual(av.aliases, {
+            'v1.1': {
+                'alias': 'v1.1',
+                'version': 'v2',
+                'params': {},
+            },
+        })
         self.assertEqual(av.types, {
             'a/a': ('%(_)s', 'v2', {}),
             'a/b': (None, 'v1', {}),
@@ -520,7 +599,13 @@ class AVersionTest(unittest2.TestCase):
                     'params': {},
                 },
             },
-            'aliases': {'v1.1': 'v2'},
+            'aliases': {
+                'v1.1': {
+                    'alias': 'v1.1',
+                    'version': 'v2',
+                    'params': {},
+                },
+            },
             'types': {
                 'a/a': dict(name='a/a', params={}, suffix='.a'),
                 'a/b': dict(name='a/b', params={}, suffix='.b'),
@@ -633,6 +718,40 @@ class AVersionTest(unittest2.TestCase):
         av = aversion.AVersion(loader, {})
         av.version_app = 'fallback'
         av.versions = dict(v1=dict(app='version1'))
+
+        result = av(request)
+
+        mock_process.assert_called_once_with(request)
+        request.get_response.assert_called_once_with('version1')
+        self.assertEqual(result, 'response')
+        self.assertEqual(request.headers, {'accept': 'a/a;q=1.0'})
+        self.assertEqual(request.environ, {
+            'aversion.config': {
+                'versions': {},
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.version': 'v1',
+            'aversion.response_type': 'a/a',
+            'aversion.orig_response_type': 'a/b',
+            'aversion.accept': None,
+        })
+
+    @mock.patch.object(aversion, 'TypeRule', FakeTypeRule)
+    @mock.patch.object(aversion.AVersion, '_process',
+                       return_value=mock.Mock(ctype='a/a', version='v1.1',
+                                              orig_ctype='a/b'))
+    def test_call_app_aliased(self, mock_process):
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: x})
+        request = mock.Mock(**{
+            'headers': {},
+            'environ': {},
+            'get_response.return_value': 'response',
+        })
+        av = aversion.AVersion(loader, {})
+        av.version_app = 'fallback'
+        av.versions = dict(v1=dict(app='version1'))
+        av.aliases = {'v1.1': dict(version='v1')}
 
         result = av(request)
 

@@ -306,6 +306,44 @@ class Result(object):
             self.orig_ctype = orig_ctype
 
 
+def _set_key(log_prefix, result_dict, key, value, desc="parameter"):
+    """
+    Helper to set a key value in a dictionary.  This function issues a
+    warning if the key has already been set, and issues a warning and
+    returns without setting the value if the value is not surrounded
+    by parentheses.  This is used to eliminate duplicated code from
+    the rule parsers below.
+
+    :param log_prefix: A prefix to use in log messages.  This should
+                       be the configuration key.
+    :param result_dict: A dictionary of results, into which the key
+                        and value should be inserted.
+    :param key: The dictionary key to insert.
+    :param value: The value to insert into the dictionary.
+    :param desc: A description of what the dictionary is.  This is
+                 used in log messages help the user understand what
+                 the log message is referring to.  By default, this
+                 description is "parameter", indicating that entries
+                 in the dictionary are parameters of something;
+                 however, _parse_type_rule() also uses "token type" to
+                 help identify its more complex tokens.
+    """
+
+    if key in result_dict:
+        LOG.warn("%s: Duplicate value for %s %r" %
+                 (log_prefix, desc, key))
+        # Allow the overwrite
+
+    # Demand the value be quoted
+    if len(value) <= 2 or value[0] not in ('"', "'") or value[0] != value[-1]:
+        LOG.warn("%s: Invalid value %r for %s %r" %
+                 (log_prefix, value, desc, key))
+        return
+
+    # Save the value
+    result_dict[key] = value[1:-1]
+
+
 def _parse_version_rule(loader, version, verspec):
     """
     Parse a version rule.  The first token is the name of the
@@ -337,24 +375,51 @@ def _parse_version_rule(loader, version, verspec):
         # What remains is key="quoted value" pairs...
         key, _eq, value = token.partition('=')
 
-        if key in result['params']:
-            LOG.warn("%s: Duplicate value for parameter %r" %
-                     (version, key))
-            # Allow the overwrite
-
-        # Demand the value be quoted
-        if (len(value) <= 2 or value[0] not in ('"', "'") or
-                value[0] != value[-1]):
-            LOG.warn("%s: Invalid parameter value %r for parameter %r" %
-                     (version, value, key))
-            continue
-
-        # Save the parameter
-        result['params'][key] = value[1:-1]
+        # Set the parameter key
+        _set_key('version.%s' % version, result['params'], key, value)
 
     # Make sure we have an application
     if 'app' not in result:
         raise ImportError("Cannot load application for version %r" % version)
+
+    return result
+
+
+def _parse_alias_rule(alias, alias_spec):
+    """
+    Parse an alias rule.  The first token is the canonical name of the
+    version.  The remaining tokens are key="quoted value" pairs that
+    specify parameters; these parameters are ignored by AVersion, but
+    may be used by the application.
+
+    :param alias: The alias name.
+    :param alias_spec: The alias text, described above.
+
+    :returns: A dictionary of three keys: "alias" is the alias name;
+              "version" is the canonical version identification
+              string; and "params" is a dictionary of parameters.
+    """
+
+    result = dict(alias=alias, params={})
+    for token in quoted_split(alias_spec, ' ', quotes='"\''):
+        if not token:
+            continue
+
+        # Suck out the canonical version name
+        if 'version' not in result:
+            result['version'] = token
+            continue
+
+        # What remains is key="quoted value" pairs...
+        key, _eq, value = token.partition('=')
+
+        # Set the parameter key
+        _set_key('alias.%s' % alias, result['params'], key, value)
+
+    # Make sure we have a canonical version
+    if 'version' not in result:
+        raise KeyError("Cannot determine canonical version for alias %r" %
+                       alias)
 
     return result
 
@@ -397,35 +462,13 @@ def _parse_type_rule(ctype, typespec):
         if tok_type == 'param':
             key, _eq, value = tok_val.partition('=')
 
-            if key in params['param']:
-                LOG.warn("%s: Duplicate value for parameter %r" %
-                         (ctype, key))
-                # Allow the overwrite
-
-            # Demand the value be quoted
-            if (len(value) <= 2 or value[0] not in ('"', "'") or
-                    value[0] != value[-1]):
-                LOG.warn("%s: Invalid parameter value %r for parameter %r" %
-                         (ctype, value, key))
-                continue
-
-            # Save the parameter and move on
-            params['param'][key] = value[1:-1]
+            # Set the parameter key
+            _set_key('type.%s' % ctype, params['param'], key, value)
             continue
 
-        # Check for duplicates
-        if tok_type in params:
-            LOG.warn("%s: Duplicate value for token type %r" %
-                     (ctype, tok_type))
-            # Allow the overwrite
-
-        # Validate the token value
-        if (len(tok_val) <= 2 or tok_val[0] not in ('"', "'") or
-                tok_val[0] != tok_val[-1]):
-            LOG.warn("%s: Unrecognized token value %r" % (ctype, tok_val))
-            continue
-
-        params[tok_type] = tok_val[1:-1]
+        # Set the token value
+        _set_key('type.%s' % ctype, params, tok_type, tok_val,
+                 desc="token type")
 
     return TypeRule(ctype=params.get('type'),
                     version=params.get('version'),
@@ -498,7 +541,7 @@ class AVersion(object):
                                                              value)
             elif key.startswith('alias.'):
                 # An alias for a given version
-                self.aliases[key[6:]] = value
+                self.aliases[key[6:]] = _parse_alias_rule(key[6:], value)
             elif key.startswith('uri.'):
                 # A mapping between URI prefixes and versions; note
                 # that the URI is normalized
@@ -574,7 +617,10 @@ class AVersion(object):
 
         # Determine the requested version; allows mapping through
         # aliases to a canonical value
-        version = self.aliases.get(result.version, result.version)
+        if result.version in self.aliases:
+            version = self.aliases[result.version]['version']
+        else:
+            version = result.version
 
         # Select the correct application
         try:
