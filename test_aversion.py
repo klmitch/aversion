@@ -1251,3 +1251,49 @@ class FunctionalTest(unittest2.TestCase):
             'content-type': NOTPRESENT,
             'accept': NOTPRESENT,
         })
+
+    def test_default_app(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version", resp.body)
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.response_type': NOTPRESENT,
+            'aversion.orig_response_type': NOTPRESENT,
+            'aversion.accept': NOTPRESENT,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': None,
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': NOTPRESENT,
+        })
