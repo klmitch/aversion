@@ -17,6 +17,7 @@ import collections
 
 import mock
 import unittest2
+import webob
 import webob.exc
 
 import aversion
@@ -1137,3 +1138,116 @@ class AVersionTest(unittest2.TestCase):
         av.types['a/a'].assert_called_once_with('v1')
         self.assertFalse(mock_set_version.called)
         self.assertFalse(mock_set_ctype.called)
+
+
+class FakeApplication(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __call__(self, environ, start_response):
+        start_response('200 OK', [])
+        yield self.name
+
+
+# Used for comparing the environment and headers dictionaries
+ANY = object()
+NOTPRESENT = object()
+
+
+class FunctionalTest(unittest2.TestCase):
+    def construct_stack(self, conf, **versions):
+        # Construct all the version applications
+        apps = {}
+        for version, params in versions.items():
+            app_key = '%s_app' % version
+            conf_key = ('version' if version == 'version' else
+                        'version.%s' % version)
+            apps[app_key] = FakeApplication(version)
+            conf[conf_key] = app_key
+
+            # Add parameters
+            if params:
+                conf[conf_key] += ' ' + ' '.join('%s="%s"' % (k, v)
+                                                 for k, v in params.items())
+
+        # Set up a loader
+        loader = mock.Mock(**{'get_app.side_effect': lambda x: apps[x]})
+
+        # Set up the stack and return it
+        return aversion.AVersion(loader, {}, **conf)
+
+    def make_request(self, path, base_url=None,
+                     content_type=None, accept=None):
+        # Build the headers for the request
+        headers = {}
+        if content_type:
+            headers['content-type'] = content_type
+        if accept:
+            headers['accept'] = accept
+
+        # Build and return the request object
+        return webob.Request.blank(path, base_url=base_url, headers=headers)
+
+    def assertPartialDict(self, actual, expected):
+        for key, value in expected.items():
+            if value == NOTPRESENT:
+                self.assertNotIn(key, actual,
+                                 msg="Value for key %r present" % key)
+                continue
+
+            self.assertIn(key, actual, msg="No value for key %r" % key)
+
+            if value == ANY:
+                continue
+
+            if isinstance(value, dict):
+                self.assertPartialDict(actual[key], value)
+            else:
+                self.assertEqual(actual[key], value,
+                                 msg="Value mismatch for key %r" % key)
+
+    def test_no_matching_app(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+        }
+        stack = self.construct_stack(conf, version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 500)
+        self.assertIn("Cannot determine application to serve request",
+                      resp.body)
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.response_type': NOTPRESENT,
+            'aversion.orig_response_type': NOTPRESENT,
+            'aversion.accept': NOTPRESENT,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': None,
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': NOTPRESENT,
+        })
