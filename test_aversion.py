@@ -1326,3 +1326,216 @@ class FunctionalTest(unittest2.TestCase):
             'content-type': NOTPRESENT,
             'accept': NOTPRESENT,
         })
+
+    def test_version1_app_urimatch(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/v1')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version1", resp.body)
+        self.assertEqual(req.script_name, '/v1')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.response_type': NOTPRESENT,
+            'aversion.orig_response_type': NOTPRESENT,
+            'aversion.accept': NOTPRESENT,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version1',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': NOTPRESENT,
+        })
+
+    def test_version2_app_urimatch_trailer(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/v2/foo')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version2", resp.body)
+        self.assertEqual(req.script_name, '/v2')
+        self.assertEqual(req.path_info, '/foo')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {},
+                'types': {},
+            },
+            'aversion.response_type': NOTPRESENT,
+            'aversion.orig_response_type': NOTPRESENT,
+            'aversion.accept': NOTPRESENT,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version2',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': NOTPRESENT,
+        })
+
+    def test_version1_app_urimatch_withformat(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+            '.json': 'application/json',
+            '.xml': 'application/xml',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/v1/.json')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version1", resp.body)
+        self.assertEqual(req.script_name, '/v1')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {},
+                'types': {
+                    'application/json': {
+                        'name': 'application/json',
+                        'params': {},
+                        'suffix': ['.json'],
+                    },
+                    'application/xml': {
+                        'name': 'application/xml',
+                        'params': {},
+                        'suffix': ['.xml'],
+                    },
+                },
+            },
+            'aversion.response_type': 'application/json',
+            'aversion.orig_response_type': None,
+            'aversion.accept': None,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version1',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': 'application/json;q=1.0',
+        })
+
+    def test_version1_1_app_urimatch_withalias(self):
+        conf = {
+            'uri./v1': 'version1',
+            'uri./v2': 'version2',
+            'uri./v1.1': 'version1.1',
+            'alias.version1.1': 'version2',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/v1.1')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version2", resp.body)
+        self.assertEqual(req.script_name, '/v1.1')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': ['/v1'],
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': ['/v2'],
+                    },
+                },
+                'aliases': {
+                    'version1.1': {
+                        'alias': 'version1.1',
+                        'version': 'version2',
+                        'params': {},
+                    },
+                },
+                'types': {},
+            },
+            'aversion.response_type': NOTPRESENT,
+            'aversion.orig_response_type': NOTPRESENT,
+            'aversion.accept': NOTPRESENT,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version2',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': NOTPRESENT,
+        })
