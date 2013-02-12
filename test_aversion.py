@@ -1206,6 +1206,31 @@ class FunctionalTest(unittest2.TestCase):
                 self.assertEqual(actual[key], value,
                                  msg="Value mismatch for key %r" % key)
 
+    def test_assert_partial_dict(self):
+        # Check that NOTPRESENT requires the key to not be present
+        self.assertRaises(AssertionError, self.assertPartialDict,
+                          dict(a=1), dict(a=NOTPRESENT))
+
+        # Check that other than NOTPRESENT requires the key to be
+        # present
+        self.assertRaises(AssertionError, self.assertPartialDict,
+                          {}, dict(a=1))
+
+        # Check that value mismatch is caught
+        self.assertRaises(AssertionError, self.assertPartialDict,
+                          dict(a=1), dict(a=2))
+
+        # Check that ANY allows any value in that location
+        self.assertPartialDict(dict(a=1), dict(a=ANY))
+        self.assertPartialDict(dict(a=2), dict(a=ANY))
+
+        # Check that recursion works properly
+        self.assertRaises(AssertionError, self.assertPartialDict,
+                          dict(a=dict(b=dict(c=1))),
+                          dict(a=dict(b=dict(c=2))))
+        self.assertPartialDict(dict(a=dict(b=dict(c=1))),
+                               dict(a=dict(b=dict(c=1))))
+
     def test_no_matching_app(self):
         conf = {
             'uri./v1': 'version1',
