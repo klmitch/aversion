@@ -726,7 +726,7 @@ class AVersion(object):
         if mapped_ctype:
             request.environ['aversion.request_type'] = mapped_ctype
             request.environ['aversion.orig_request_type'] = ctype
-            request.environ['aversion.content-type'] = \
+            request.environ['aversion.content_type'] = \
                 request.headers['content-type']
             if self.overwrite_headers:
                 request.headers['content-type'] = mapped_ctype

@@ -986,7 +986,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(request.environ, {
             'aversion.request_type': 'a/c',
             'aversion.orig_request_type': 'a/a',
-            'aversion.content-type': 'a/b',
+            'aversion.content_type': 'a/b',
         })
         self.assertFalse(mock_set_ctype.called)
         self.assertEqual(result.version, 'v2')
@@ -1012,7 +1012,7 @@ class AVersionTest(unittest2.TestCase):
         self.assertEqual(request.environ, {
             'aversion.request_type': 'a/c',
             'aversion.orig_request_type': 'a/a',
-            'aversion.content-type': 'a/b',
+            'aversion.content_type': 'a/b',
         })
         self.assertFalse(mock_set_ctype.called)
         self.assertEqual(result.version, 'v2')
@@ -1271,7 +1271,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': None,
         })
         self.assertPartialDict(req.headers, {
@@ -1319,7 +1319,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': None,
         })
         self.assertPartialDict(req.headers, {
@@ -1367,7 +1367,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version1',
         })
         self.assertPartialDict(req.headers, {
@@ -1415,7 +1415,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1476,7 +1476,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': None,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version1',
         })
         self.assertPartialDict(req.headers, {
@@ -1532,7 +1532,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1593,7 +1593,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': 'application/json',
             'aversion.orig_request_type': 'application/json',
-            'aversion.content-type': 'application/json;v=1',
+            'aversion.content_type': 'application/json;v=1',
             'aversion.version': 'version1',
         })
         self.assertPartialDict(req.headers, {
@@ -1661,7 +1661,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': 'application/xml',
             'aversion.orig_request_type': 'application/xml',
-            'aversion.content-type': 'application/xml;v=1.1',
+            'aversion.content_type': 'application/xml;v=1.1',
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1717,7 +1717,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': 'application/xml',
             'aversion.orig_request_type': 'application/vnd.spam',
-            'aversion.content-type': ctype,
+            'aversion.content_type': ctype,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1774,7 +1774,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': NOTPRESENT,
             'aversion.request_type': 'application/xml',
             'aversion.orig_request_type': 'application/vnd.spam',
-            'aversion.content-type': ctype,
+            'aversion.content_type': ctype,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1835,7 +1835,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': 'application/json;v=1',
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version1',
         })
         self.assertPartialDict(req.headers, {
@@ -1903,7 +1903,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': 'application/xml;v=1.1',
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -1959,7 +1959,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': accept,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
@@ -2016,7 +2016,7 @@ class FunctionalTest(unittest2.TestCase):
             'aversion.accept': accept,
             'aversion.request_type': NOTPRESENT,
             'aversion.orig_request_type': NOTPRESENT,
-            'aversion.content-type': NOTPRESENT,
+            'aversion.content_type': NOTPRESENT,
             'aversion.version': 'version2',
         })
         self.assertPartialDict(req.headers, {
