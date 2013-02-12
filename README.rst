@@ -262,8 +262,8 @@ configured components, as described below.
     and ``suffixes``, if present, contains a list of configured URI
     suffixes for that type.
 
-Examples
-~~~~~~~~
+Examples of ``aversion.config``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 What follows is an example of the value of ``aversion.config``, as it
 would appear if the above example configuration was used; note that
