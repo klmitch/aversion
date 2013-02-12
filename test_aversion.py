@@ -1245,6 +1245,8 @@ class FunctionalTest(unittest2.TestCase):
         self.assertEqual(resp.status_int, 500)
         self.assertIn("Cannot determine application to serve request",
                       resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
         self.assertPartialDict(req.environ, {
             'aversion.config': {
                 'versions': {
@@ -1291,6 +1293,8 @@ class FunctionalTest(unittest2.TestCase):
 
         self.assertEqual(resp.status_int, 200)
         self.assertEqual("version", resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
         self.assertPartialDict(req.environ, {
             'aversion.config': {
                 'versions': {
