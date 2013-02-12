@@ -120,6 +120,26 @@ the desired content type::
 
     .json = application/json
 
+Finally, the ``type.`` keys may select a version other than the one
+which is desired.  For instance, the two API versions "v1.1" and
+"v2"--appearing as a parameter to a content type--may identify the
+same version of the API.  To enable this, use the ``alias.`` keys,
+like so::
+
+    alias.v1.1 = v2
+
+In this example, the content type
+"application/vnd.fooapp;fmt=json;version=1.1" would also make a call
+to the "v2" API.
+
+Although the above description of ``alias.`` references content types,
+aliasing also works for URIs, e.g.::
+
+    uri./v1.1 = v1.1
+
+Here, accesses to the "/v1.1" endpoint will also be passed to the "v2"
+api.
+
 Putting this all together, a complete AVersion configuration may look
 like the following::
 
@@ -131,8 +151,12 @@ like the following::
     version.v1 = api_v1
     version.v2 = api_v2
 
+    # Specify an alias
+    alias.v1.1 = v2
+
     # Map the URI prefixes
     uri./v1 = v1
+    uri./v1.1 = v1.1
     uri./v2 = v2
 
     # Recognize several types
@@ -186,3 +210,191 @@ dictionary containing those parameters.  Finally, ``best_match()``
 implements the best-match algorithm for content types, and may be
 useful as an example for implementing matchers for other "Accept-*"
 headers.
+
+Advanced AVersion Usage
+=======================
+
+AVersion adds several variables to the WSGI environment that may be
+useful to applications.  The added WSGI environment variables all
+begin with ``aversion.`` and are described below.
+
+``aversion.version``
+--------------------
+
+The ``aversion.version`` variable contains the name of the selected
+version.  If the default application is selected, this value will be
+``None``.  Otherwise, it will be a string identifying the configured
+version.
+
+``aversion.config``
+-------------------
+
+The ``aversion.config`` variable contains a dictionary of three
+entries: "versions", "aliases", and "types".  Each of these entries
+contains a dictionary which contains further information about the
+configured components, as described below.
+
+``versions``
+~~~~~~~~~~~~
+
+The ``versions`` element of the ``aversion.config`` variable is keyed
+by version names.  Each version is described by a dictionary of three
+or four entries: the ``name`` key contains the name of the version;
+``app`` is a reference to the WSGI application implementing that API
+version; ``params`` is a dictionary containing version parameters (see
+`Advanced AVersion Configuration`_); and ``prefixes``, if present,
+contains a list of configured URI prefixes for that version.
+
+``aliases``
+~~~~~~~~~~~
+
+The ``aliases`` element of the ``aversion.config`` variable is keyed
+by aliases.  Each alias is described by a dictionary of three entries:
+the ``alias`` key contains the name of the alias; the ``version`` key
+contains the canonical version name corresponding to the alias; and
+``params`` is a dictionary containing alias parameters (see `Advanced
+AVersion Configuration`_).
+
+``types``
+~~~~~~~~~
+
+The ``types`` element of the ``aversion.config`` variable is keyed by
+content types.  Each content type is described by a dictionary of two
+or three entries: the ``name`` key contains the name of the content
+type; the ``params`` key is a dictionary containing content type
+parameters (see `Advanced AVersion Configuration`_); and ``suffixes``,
+if present, contains a list of configured URI suffixes for that type.
+
+Examples
+~~~~~~~~
+
+What follows is an example of the value of ``aversion.config``, as it
+would appear if the above example configuration was used; note that
+``params`` is an empty dictionary in all cases (`Advanced AVersion
+Configuration`_ covers parameters for versions, aliases, and content
+types in more detail)::
+
+    {
+        'versions': {
+            'v1': {
+                'name': 'v1',
+                'app': <Python callable>,
+                'params': {},
+                'prefixes': ['/v1'],
+            },
+            'v2': {
+                'name': 'v2',
+                'app': <Python callable>,
+                'params': {},
+                'prefixes': ['/v2'],
+            },
+        },
+        'aliases': {
+            'v1.1': {
+                'alias': 'v1.1',
+                'version': 'v2',
+                'params': {},
+            },
+        },
+        'types': {
+            'application/json': {
+                'name': 'application/json',
+                'params': {},
+                'suffixes': ['.json'],
+            },
+            'application/xml': {
+                'name': 'application/xml',
+                'params': {},
+                'suffixes': ['.xml'],
+            },
+            'application/vnd.fooapp': {
+                'name': 'application/vnd.fooapp',
+                'params': {},
+            },
+        },
+    }
+
+It is also worth noting that the type "application/vnd.fooapp" has no
+configured suffixes, and so the ``suffixes`` key is omitted from its
+description.  Similarly, if a version was declared for which there was
+no corresponding URI prefix, that version would not have a
+``prefixes`` key.
+
+Variables Associated with the "Content-Type" Header
+---------------------------------------------------
+
+There are three variables associated with the "Content-Type" header.
+They are only set if a "Content-Type" header is set on the request,
+and is matched by a type rule, and are described below.
+
+``aversion.request_type``
+    This is the final content type for the body of the request, after
+    transformation by the type rule.  This value will also be used to
+    overwrite the "Content-Type" header.
+
+``aversion.orig_request_type``
+    This is the name of the matching type rule.
+
+``aversion.content_type``
+    This will be the original value of the "Content-Type" header.
+
+Variables Associated with the "Accept" Header
+---------------------------------------------
+
+There are three variables associated with the "Accept" header.  They
+are set if the requested content type can be determined.  The
+requested content type may be determined from a URI suffix or from the
+contents of the "Accept" header, and are described below.
+
+``aversion.response_type``
+    This is the final content type requested by the client, after
+    transformation by the type rule.  This value will also be used to
+    overwrite the "Accept" header.
+
+``aversion.orig_response_type``
+    This is the name of the matching type rule.  If the content type
+    was determined from a URI suffix, this value will be ``None``.
+
+``aversion.accept``
+    This will be the original value of the "Accept" header.  If none
+    was present in the request (e.g., if the requested content type
+    was determined from a URI suffix rule), this value will be
+    ``None``.
+
+Advanced AVersion Configuration
+===============================
+
+The discussion about the ``aversion.config`` WSGI environment variable
+referred to parameters on versions, aliases, and content types.  These
+parameters are specifically for the benefit of applications, and are
+ignored by AVersion; they can be used for communicating important
+information about the configured versions, aliases, and content types
+to the applications, particularly the default application.
+
+To configure parameters on versions, simply add 'key="value"' after
+the version application name, e.g.::
+
+    version.v1 = api_v1 key1="value1" key2="value2"
+
+For aliases, the syntax is similar::
+
+    alias.v1.1 = v2 key1="value1" key2="value2"
+
+The syntax is a little more complex for content type rules; the
+'key="value"' tokens must be prefixed with "param:", e.g.::
+
+    type.application/json = version:"v%(version)s"
+        param:key1="value1" param:key2="value2"
+
+Note that all values must be quoted.  Both double quotes and single
+quotes are acceptable quote characters, and it is safe to include
+spaces within the quoted text.
+
+There is one more advanced configuration topic.  By default, AVersion
+overwrites the "Accept" and "Content-Type" headers.  Since the
+information it would use for this overwriting is available in the WSGI
+environment, it is possible to disable this behavior by setting the
+``overwrite_headers`` configuration key to "off".  (Recognized values
+are: "false", "f", "off", "no", "disable", and "0"; "true", "t", "on",
+"yes", "enable", and any non-zero integer are recognized as "on", the
+default value for ``overwrite_headers``.)
