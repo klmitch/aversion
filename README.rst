@@ -235,35 +235,32 @@ contains a dictionary which contains further information about the
 configured components, as described below.
 
 ``versions``
-~~~~~~~~~~~~
-
-The ``versions`` element of the ``aversion.config`` variable is keyed
-by version names.  Each version is described by a dictionary of three
-or four entries: the ``name`` key contains the name of the version;
-``app`` is a reference to the WSGI application implementing that API
-version; ``params`` is a dictionary containing version parameters (see
-`Advanced AVersion Configuration`_); and ``prefixes``, if present,
-contains a list of configured URI prefixes for that version.
+    The ``versions`` element of the ``aversion.config`` variable is
+    keyed by version names.  Each version is described by a dictionary
+    of three or four entries: the ``name`` key contains the name of
+    the version; ``app`` is a reference to the WSGI application
+    implementing that API version; ``params`` is a dictionary
+    containing version parameters (see `Advanced AVersion
+    Configuration`_); and ``prefixes``, if present, contains a list of
+    configured URI prefixes for that version.
 
 ``aliases``
-~~~~~~~~~~~
-
-The ``aliases`` element of the ``aversion.config`` variable is keyed
-by aliases.  Each alias is described by a dictionary of three entries:
-the ``alias`` key contains the name of the alias; the ``version`` key
-contains the canonical version name corresponding to the alias; and
-``params`` is a dictionary containing alias parameters (see `Advanced
-AVersion Configuration`_).
+    The ``aliases`` element of the ``aversion.config`` variable is
+    keyed by aliases.  Each alias is described by a dictionary of
+    three entries: the ``alias`` key contains the name of the alias;
+    the ``version`` key contains the canonical version name
+    corresponding to the alias; and ``params`` is a dictionary
+    containing alias parameters (see `Advanced AVersion
+    Configuration`_).
 
 ``types``
-~~~~~~~~~
-
-The ``types`` element of the ``aversion.config`` variable is keyed by
-content types.  Each content type is described by a dictionary of two
-or three entries: the ``name`` key contains the name of the content
-type; the ``params`` key is a dictionary containing content type
-parameters (see `Advanced AVersion Configuration`_); and ``suffixes``,
-if present, contains a list of configured URI suffixes for that type.
+    The ``types`` element of the ``aversion.config`` variable is keyed
+    by content types.  Each content type is described by a dictionary
+    of two or three entries: the ``name`` key contains the name of the
+    content type; the ``params`` key is a dictionary containing
+    content type parameters (see `Advanced AVersion Configuration`_);
+    and ``suffixes``, if present, contains a list of configured URI
+    suffixes for that type.
 
 Examples
 ~~~~~~~~
