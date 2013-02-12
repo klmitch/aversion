@@ -1489,7 +1489,7 @@ class FunctionalTest(unittest2.TestCase):
             'uri./v1': 'version1',
             'uri./v2': 'version2',
             'uri./v1.1': 'version1.1',
-            'alias.version1.1': 'version2',
+            'alias.version1.1': 'version2 map="1.1->2"',
         }
         stack = self.construct_stack(conf, version={},
                                      version1=dict(v='v1'),
@@ -1522,7 +1522,7 @@ class FunctionalTest(unittest2.TestCase):
                     'version1.1': {
                         'alias': 'version1.1',
                         'version': 'version2',
-                        'params': {},
+                        'params': dict(map="1.1->2"),
                     },
                 },
                 'types': {},
