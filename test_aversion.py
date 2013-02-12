@@ -608,8 +608,8 @@ class AVersionTest(unittest2.TestCase):
                 },
             },
             'types': {
-                'a/a': dict(name='a/a', params={}, suffix=['.a']),
-                'a/b': dict(name='a/b', params={}, suffix=['.b']),
+                'a/a': dict(name='a/a', params={}, suffixes=['.a']),
+                'a/b': dict(name='a/b', params={}, suffixes=['.b']),
                 'a/c': dict(name='a/c', params={}),
             },
         })
@@ -1462,12 +1462,12 @@ class FunctionalTest(unittest2.TestCase):
                     'application/json': {
                         'name': 'application/json',
                         'params': {},
-                        'suffix': ['.json'],
+                        'suffixes': ['.json'],
                     },
                     'application/xml': {
                         'name': 'application/xml',
                         'params': {},
-                        'suffix': ['.xml'],
+                        'suffixes': ['.xml'],
                     },
                 },
             },
@@ -1579,12 +1579,12 @@ class FunctionalTest(unittest2.TestCase):
                     'application/json': {
                         'name': 'application/json',
                         'params': dict(type='json'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                     'application/xml': {
                         'name': 'application/xml',
                         'params': dict(type='xml'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1647,12 +1647,12 @@ class FunctionalTest(unittest2.TestCase):
                     'application/json': {
                         'name': 'application/json',
                         'params': dict(type='json'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                     'application/xml': {
                         'name': 'application/xml',
                         'params': dict(type='xml'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1708,7 +1708,7 @@ class FunctionalTest(unittest2.TestCase):
                     'application/vnd.spam': {
                         'name': 'application/vnd.spam',
                         'params': dict(type='spam'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1765,7 +1765,7 @@ class FunctionalTest(unittest2.TestCase):
                     'application/vnd.spam': {
                         'name': 'application/vnd.spam',
                         'params': dict(type='spam'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1821,12 +1821,12 @@ class FunctionalTest(unittest2.TestCase):
                     'application/json': {
                         'name': 'application/json',
                         'params': dict(type='json'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                     'application/xml': {
                         'name': 'application/xml',
                         'params': dict(type='xml'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1889,12 +1889,12 @@ class FunctionalTest(unittest2.TestCase):
                     'application/json': {
                         'name': 'application/json',
                         'params': dict(type='json'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                     'application/xml': {
                         'name': 'application/xml',
                         'params': dict(type='xml'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -1950,7 +1950,7 @@ class FunctionalTest(unittest2.TestCase):
                     'application/vnd.spam': {
                         'name': 'application/vnd.spam',
                         'params': dict(type='spam'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },
@@ -2007,7 +2007,7 @@ class FunctionalTest(unittest2.TestCase):
                     'application/vnd.spam': {
                         'name': 'application/vnd.spam',
                         'params': dict(type='spam'),
-                        'suffix': NOTPRESENT,
+                        'suffixes': NOTPRESENT,
                     },
                 },
             },

@@ -578,8 +578,8 @@ class AVersion(object):
         # Add in information about the formats
         for suffix, ctype in self.formats.items():
             types.setdefault(ctype, dict(name=ctype, params={}))
-            types[ctype].setdefault('suffix', [])
-            types[ctype]['suffix'].append(suffix)
+            types[ctype].setdefault('suffixes', [])
+            types[ctype]['suffixes'].append(suffix)
 
         # Now, build the config dictionary tree we will pass to
         # requests
