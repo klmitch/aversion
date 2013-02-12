@@ -1781,3 +1781,245 @@ class FunctionalTest(unittest2.TestCase):
             'content-type': ctype,
             'accept': NOTPRESENT,
         })
+
+    def test_version1_app_acceptmatch(self):
+        conf = {
+            'type.application/json': ('version:"version%(v)s" '
+                                      'param:type="json"'),
+            'type.application/xml': ('version:"version%(v)s" '
+                                     'param:type="xml"'),
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/', accept='application/json;v=1')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version1", resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': NOTPRESENT,
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': NOTPRESENT,
+                    },
+                },
+                'aliases': {},
+                'types': {
+                    'application/json': {
+                        'name': 'application/json',
+                        'params': dict(type='json'),
+                        'suffix': NOTPRESENT,
+                    },
+                    'application/xml': {
+                        'name': 'application/xml',
+                        'params': dict(type='xml'),
+                        'suffix': NOTPRESENT,
+                    },
+                },
+            },
+            'aversion.response_type': 'application/json',
+            'aversion.orig_response_type': 'application/json',
+            'aversion.accept': 'application/json;v=1',
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version1',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': 'application/json;q=1.0',
+        })
+
+    def test_version1_1_app_acceptmatch_withalias(self):
+        conf = {
+            'type.application/json': ('version:"version%(v)s" '
+                                      'param:type="json"'),
+            'type.application/xml': ('version:"version%(v)s" '
+                                     'param:type="xml"'),
+            'alias.version1.1': 'version2 map="1.1->2"',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        req = self.make_request('/', accept='application/xml;v=1.1')
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version2", resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': NOTPRESENT,
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': NOTPRESENT,
+                    },
+                },
+                'aliases': {
+                    'version1.1': {
+                        'alias': 'version1.1',
+                        'version': 'version2',
+                        'params': dict(map="1.1->2"),
+                    },
+                },
+                'types': {
+                    'application/json': {
+                        'name': 'application/json',
+                        'params': dict(type='json'),
+                        'suffix': NOTPRESENT,
+                    },
+                    'application/xml': {
+                        'name': 'application/xml',
+                        'params': dict(type='xml'),
+                        'suffix': NOTPRESENT,
+                    },
+                },
+            },
+            'aversion.response_type': 'application/xml',
+            'aversion.orig_response_type': 'application/xml',
+            'aversion.accept': 'application/xml;v=1.1',
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version2',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': 'application/xml;q=1.0',
+        })
+
+    def test_version2_app_acceptmatch_typerewrite(self):
+        conf = {
+            'type.application/vnd.spam': ('version:"version%(v)s" '
+                                          'type:"application/%(x)s" '
+                                          'param:type="spam"'),
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        accept = 'application/vnd.spam;v=2;x="xml";y=42'
+        req = self.make_request('/', accept=accept)
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version2", resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': NOTPRESENT,
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': NOTPRESENT,
+                    },
+                },
+                'aliases': {},
+                'types': {
+                    'application/vnd.spam': {
+                        'name': 'application/vnd.spam',
+                        'params': dict(type='spam'),
+                        'suffix': NOTPRESENT,
+                    },
+                },
+            },
+            'aversion.response_type': 'application/xml',
+            'aversion.orig_response_type': 'application/vnd.spam',
+            'aversion.accept': accept,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version2',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': 'application/xml;q=1.0',
+        })
+
+    def test_version2_app_acceptmatch_notyperewrite(self):
+        conf = {
+            'type.application/vnd.spam': ('version:"version%(v)s" '
+                                          'type:"application/%(x)s" '
+                                          'param:type="spam"'),
+            'overwrite_headers': 'off',
+        }
+        stack = self.construct_stack(conf, version={},
+                                     version1=dict(v='v1'),
+                                     version2=dict(v='v2'))
+        accept = 'application/vnd.spam;v=2;x="xml";y=42'
+        req = self.make_request('/', accept=accept)
+
+        resp = req.get_response(stack)
+
+        self.assertEqual(resp.status_int, 200)
+        self.assertEqual("version2", resp.body)
+        self.assertEqual(req.script_name, '')
+        self.assertEqual(req.path_info, '/')
+        self.assertPartialDict(req.environ, {
+            'aversion.config': {
+                'versions': {
+                    'version1': {
+                        'name': 'version1',
+                        'app': ANY,
+                        'params': dict(v='v1'),
+                        'prefixes': NOTPRESENT,
+                    },
+                    'version2': {
+                        'name': 'version2',
+                        'app': ANY,
+                        'params': dict(v='v2'),
+                        'prefixes': NOTPRESENT,
+                    },
+                },
+                'aliases': {},
+                'types': {
+                    'application/vnd.spam': {
+                        'name': 'application/vnd.spam',
+                        'params': dict(type='spam'),
+                        'suffix': NOTPRESENT,
+                    },
+                },
+            },
+            'aversion.response_type': 'application/xml',
+            'aversion.orig_response_type': 'application/vnd.spam',
+            'aversion.accept': accept,
+            'aversion.request_type': NOTPRESENT,
+            'aversion.orig_request_type': NOTPRESENT,
+            'aversion.content-type': NOTPRESENT,
+            'aversion.version': 'version2',
+        })
+        self.assertPartialDict(req.headers, {
+            'content-type': NOTPRESENT,
+            'accept': accept,
+        })
