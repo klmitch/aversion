@@ -608,8 +608,8 @@ class AVersionTest(unittest2.TestCase):
                 },
             },
             'types': {
-                'a/a': dict(name='a/a', params={}, suffix='.a'),
-                'a/b': dict(name='a/b', params={}, suffix='.b'),
+                'a/a': dict(name='a/a', params={}, suffix=['.a']),
+                'a/b': dict(name='a/b', params={}, suffix=['.b']),
                 'a/c': dict(name='a/c', params={}),
             },
         })
