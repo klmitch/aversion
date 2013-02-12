@@ -30,7 +30,7 @@ setup(
     license='Apache License (2.0)',
     py_modules=['aversion'],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: Apache Software License',
         'Environment :: Web Environment',
         'Intended Audience :: System Administrators',
