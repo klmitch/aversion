@@ -208,7 +208,7 @@ separator.  The ``parse_ctype()`` function takes a content type,
 complete with its parameters, and returns the bare content type and a
 dictionary containing those parameters.  Finally, ``best_match()``
 implements the best-match algorithm for content types, and may be
-useful as an example for implementing matchers for other "Accept-*"
+useful as an example for implementing matchers for other "Accept-\*"
 headers.
 
 Advanced AVersion Usage
